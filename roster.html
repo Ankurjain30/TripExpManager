@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Trip Roster - Trip Expense Manager</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Centralized Cloud Configuration & Sync Script -->
+    <script src="config.js"></script>
+    <meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+</head>
+<body class="bg-[#F8F9FA] text-[#212529] font-sans antialiased pb-28 min-h-screen relative">
+
+    <!-- Header -->
+    <header class="bg-[#212529] text-white sticky top-0 z-50 shadow-md">
+        <div class="max-w-md mx-auto px-4 py-3 flex justify-between items-center">
+            <a href="index.html" class="text-sm text-gray-300 hover:text-white">&larr; Back to Dashboard</a>
+            <h1 id="pageTitle" class="text-base font-bold">Trip Roster</h1>
+            <div class="w-12"></div>
+        </div>
+    </header>
+
+    <main class="max-w-md mx-auto p-4 space-y-4">
+
+        <!-- Trip Switcher & Info Card -->
+        <section class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
+            <div class="flex justify-between items-center">
+                <h2 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Active Trip</h2>
+                <select id="tripSwitcher" onchange="switchTrip(this.value)" class="bg-gray-50 border border-gray-200 rounded-lg p-1.5 text-xs font-bold text-black focus:outline-none focus:border-black cursor-pointer">
+                    <!-- Populated dynamically -->
+                </select>
+            </div>
+            <div>
+                <h3 id="tripDestination" class="text-base font-bold text-black">Select a Trip</h3>
+                <p id="tripNature" class="text-xs text-gray-500">-</p>
+            </div>
+        </section>
+
+        <!-- Trip Roster Header Actions -->
+        <section class="space-y-3">
+            <div class="flex justify-between items-center px-1">
+                <h2 class="text-sm font-bold text-black">Assigned Participants</h2>
+                <div class="flex space-x-2">
+                    <button onclick="openAddFamiliesModal()" class="bg-[#0D6EFD] text-white text-xs font-bold px-3 py-2 rounded-xl shadow-sm cursor-pointer hover:opacity-90">
+                        + Add Families
+                    </button>
+                    <button onclick="window.location.href='participants.html'" class="bg-gray-100 text-gray-700 text-xs font-bold px-3 py-2 rounded-xl shadow-sm cursor-pointer hover:bg-gray-200">
+                        + Add Individual
+                    </button>
+                </div>
+            </div>
+
+            <!-- Roster List Container -->
+            <div id="rvTripRoster" class="space-y-2">
+                <p class="text-xs text-gray-400 bg-white p-4 rounded-xl border border-gray-100 text-center">No participants assigned to this trip yet.</p>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Trip Roster Logic Script -->
+    <script>
+        let activeTripId = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (typeof syncFromCloud === 'function') {
+                await syncFromCloud();
+            }
+
+            const trips = JSON.parse(localStorage.getItem('trips') || '[]');
+            if (trips.length === 0) {
+                alert('No trips found. Please create a trip first.');
+                window.location.href = 'index.html';
+                return;
+            }
+
+            const activeTrips = trips.filter(t => t.status !== 'closed');
+            const targetTrips = activeTrips.length > 0 ? activeTrips : trips;
+
+            const urlParams = new URLSearchParams(window.location.search);
+            activeTripId = urlParams.get('tripId') || localStorage.getItem('activeTripId');
+
+            // If only 1 active trip exists, automatically select it without prompting/switching overhead
+            if (targetTrips.length === 1) {
+                activeTripId = targetTrips[0].id;
+                localStorage.setItem('activeTripId', activeTripId);
+            } else if (!activeTripId || !trips.some(t => t.id == activeTripId)) {
+                activeTripId = targetTrips[0].id;
+                localStorage.setItem('activeTripId', activeTripId);
+            }
+
+            populateTripSwitcher(trips, activeTripId);
+            loadTripDetails();
+            loadTripRoster();
+        });
+
+        function populateTripSwitcher(trips, currentId) {
+            const switcher = document.getElementById('tripSwitcher');
+            switcher.innerHTML = '';
+            trips.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.id;
+                opt.textContent = `${t.destination} (${t.nature})`;
+                if (t.id == currentId) opt.selected = true;
+                switcher.appendChild(opt);
+            });
+        }
+
+        function switchTrip(newTripId) {
+            activeTripId = Number(newTripId);
+            localStorage.setItem('activeTripId', activeTripId);
+            loadTripDetails();
+            loadTripRoster();
+        }
+
+        function loadTripDetails() {
+            const trips = JSON.parse(localStorage.getItem('trips') || '[]');
+            const trip = trips.find(t => t.id == activeTripId);
+
+            if (trip) {
+                document.getElementById('tripDestination').textContent = trip.destination;
+                document.getElementById('tripNature').textContent = `Nature: ${trip.nature}`;
+                document.getElementById('pageTitle').textContent = `${trip.destination} Roster`;
+            }
+        }
+
+        function loadTripRoster() {
+            const participants = JSON.parse(localStorage.getItem('participants') || '[]');
+            const tripParticipantsMap = JSON.parse(localStorage.getItem('tripParticipants') || '{}');
+            const assignedIds = tripParticipantsMap[activeTripId] || [];
+
+            const container = document.getElementById('rvTripRoster');
+            container.innerHTML = '';
+
+            const assignedParticipants = participants.filter(p => assignedIds.includes(p.id));
+
+            if (assignedParticipants.length === 0) {
+                container.innerHTML = '<p class="text-xs text-gray-400 bg-white p-4 rounded-xl border border-gray-100 text-center">No participants assigned to this trip yet.</p>';
+                return;
+            }
+
+            assignedParticipants.forEach(p => {
+                const card = document.createElement('div');
+                card.className = 'bg-white p-3 rounded-xl border border-gray-100 flex justify-between items-center text-xs';
+                card.innerHTML = `
+                    <div>
+                        <p class="font-bold text-black text-sm">${p.name} <span class="text-[10px] text-gray-500 font-normal">(${p.category || 'Adult'})</span></p>
+                        <p class="text-gray-400 text-[11px]">Family: ${p.family || 'Unassigned'}</p>
+                    </div>
+                    <button onclick="removeParticipantFromTrip(${p.id})" class="bg-[#DC3545] text-white font-bold px-2.5 py-1 rounded-lg text-[11px] shadow-sm">Remove</button>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function openAddFamiliesModal() {
+            const families = JSON.parse(localStorage.getItem('families') || '[]');
+            const participants = JSON.parse(localStorage.getItem('participants') || '[]');
+            
+            if (families.length === 0) {
+                alert('No families found. Please create families in the Families section first.');
+                return;
+            }
+
+            let familyChoices = families.map((f, idx) => {
+                const memberCount = participants.filter(p => p.familyId == f.id || p.family === f.familyName).length;
+                return `${idx + 1}. ${f.familyName} (${memberCount} members)`;
+            }).join('\n');
+
+            const selection = prompt(`Select Family to Add to this Trip:\n${familyChoices}`, '1');
+            if (selection === null) return;
+
+            const index = parseInt(selection) - 1;
+            if (!isNaN(index) && families[index]) {
+                const selectedFamily = families[index];
+                const familyMemberIds = participants
+                    .filter(p => p.familyId == selectedFamily.id || p.family === selectedFamily.familyName)
+                    .map(p => p.id);
+
+                if (familyMemberIds.length === 0) {
+                    alert(`No members found inside "${selectedFamily.familyName}".`);
+                    return;
+                }
+
+                let tripMappings = JSON.parse(localStorage.getItem('tripParticipants') || '{}');
+                let existingAssigned = tripMappings[activeTripId] || [];
+                
+                const combinedIds = Array.from(new Set([...existingAssigned, ...familyMemberIds]));
+                tripMappings[activeTripId] = combinedIds;
+                
+                localStorage.setItem('tripParticipants', JSON.stringify(tripMappings));
+
+                // Sync changes to GitHub Gist cloud backend via config.js
+                if (typeof syncToCloud === 'function') {
+                    syncToCloud();
+                }
+
+                alert(`Successfully added all members of "${selectedFamily.familyName}" to the trip!`);
+                loadTripRoster();
+            } else {
+                alert('Invalid selection.');
+            }
+        }
+
+        function removeParticipantFromTrip(participantId) {
+            if (confirm('Remove this participant from the trip roster?')) {
+                let tripMappings = JSON.parse(localStorage.getItem('tripParticipants') || '{}');
+                let existingAssigned = tripMappings[activeTripId] || [];
+                
+                tripMappings[activeTripId] = existingAssigned.filter(id => id !== participantId);
+                localStorage.setItem('tripParticipants', JSON.stringify(tripMappings));
+
+                // Sync changes to GitHub Gist cloud backend via config.js
+                if (typeof syncToCloud === 'function') {
+                    syncToCloud();
+                }
+
+                loadTripRoster();
+            }
+        }
+    </script>
+</body>
+</html>

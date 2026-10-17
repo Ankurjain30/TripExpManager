@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Share App - Trip Expense Manager</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Centralized Cloud Configuration & Sync Script -->
+    <script src="config.js"></script>
+   <meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+</head>
+<body class="bg-[#F8F9FA] text-[#212529] font-sans antialiased pb-12">
+
+    <!-- Header -->
+    <header class="bg-[#212529] text-white sticky top-0 z-50 shadow-md">
+        <div class="max-w-md mx-auto px-4 py-3 flex justify-between items-center">
+            <a href="index.html" class="text-sm text-gray-300 hover:text-white">&larr; Back to Dashboard</a>
+            <h1 class="text-base font-bold">Share Application</h1>
+            <div class="w-12"></div>
+        </div>
+    </header>
+
+    <main class="max-w-md mx-auto p-4 space-y-4">
+
+        <!-- Share Card -->
+        <section class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 space-y-4 text-center">
+            <div class="text-4xl py-2">🔗</div>
+            <h2 class="text-base font-bold text-black">Share Trip Expense Manager</h2>
+            <p class="text-xs text-gray-500 leading-relaxed">
+                Send this web app link to co-travelers so they can open or install it instantly on their phones.
+            </p>
+
+            <div class="pt-2 space-y-3">
+                <!-- Share Button -->
+                <button id="btnShareNative" class="w-full bg-[#0D6EFD] text-white font-bold py-3.5 rounded-xl shadow-md active:opacity-95 transition text-sm flex items-center justify-center space-x-2 cursor-pointer">
+                    <span>📤 Share via Device Menu</span>
+                </button>
+
+                <!-- Copy Link Button -->
+                <button id="btnCopyLink" class="w-full bg-[#212529] text-white font-bold py-3.5 rounded-xl shadow-md active:opacity-95 transition text-sm flex items-center justify-center space-x-2 cursor-pointer">
+                    <span>📋 Copy App Link</span>
+                </button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modal for Link Sharing / Copying -->
+    <div id="shareModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-xl text-center">
+            <h3 id="modalTitle" class="text-base font-bold text-black">Share App Link</h3>
+            <p id="modalDesc" class="text-xs text-gray-500">Copy the link below to share with your travel group:</p>
+            <input type="text" id="modalShareUrl" readonly class="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs font-mono text-center select-all focus:outline-none">
+            <div class="flex space-x-2 pt-2">
+                <button onclick="closeShareModal()" class="w-1/2 bg-gray-100 text-gray-700 font-bold py-2.5 rounded-xl text-xs">Close</button>
+                <button onclick="copyModalUrl()" class="w-1/2 bg-[#0D6EFD] text-white font-bold py-2.5 rounded-xl text-xs shadow-sm">Copy Link</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Share Logic Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (typeof syncFromCloud === 'function') {
+                await syncFromCloud();
+            }
+
+            const currentUrl = window.location.href.includes('share.html') 
+                ? window.location.href.replace('share.html', 'index.html') 
+                : window.location.origin + '/index.html';
+            
+            const btnShare = document.getElementById('btnShareNative');
+            btnShare.addEventListener('click', () => {
+                // If running locally on a laptop (file://) or browser without native share support, open modal directly
+                if (window.location.protocol === 'file:' || !navigator.share) {
+                    document.getElementById('modalTitle').textContent = 'Desktop Notice';
+                    document.getElementById('modalDesc').textContent = 'The "Device Menu" sharing feature is designed for mobile devices. To share from your laptop, copy the URL below:';
+                    document.getElementById('modalShareUrl').value = currentUrl;
+                    document.getElementById('shareModal').classList.remove('hidden');
+                } else {
+                    // Mobile device with secure HTTPS or web server support
+                    navigator.share({
+                        title: 'Trip Expense Manager',
+                        text: 'Manage trips and split expenses easily with this app!',
+                        url: currentUrl,
+                    }).catch(() => {});
+                }
+            });
+
+            document.getElementById('btnCopyLink').addEventListener('click', () => {
+                document.getElementById('modalTitle').textContent = 'Share App Link';
+                document.getElementById('modalDesc').textContent = 'Copy the link below to share with your travel group:';
+                document.getElementById('modalShareUrl').value = currentUrl;
+                document.getElementById('shareModal').classList.remove('hidden');
+            });
+        });
+
+        function closeShareModal() {
+            document.getElementById('shareModal').classList.add('hidden');
+        }
+
+        function copyModalUrl() {
+            const input = document.getElementById('modalShareUrl');
+            input.select();
+            input.setSelectionRange(0, 99999);
+            try {
+                navigator.clipboard.writeText(input.value).then(() => {
+                    alert('App link copied to clipboard!');
+                    closeShareModal();
+                });
+            } catch (e) {
+                alert('Please manually copy the highlighted text.');
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Trip Settlement & Report - Trip Expense Manager</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Centralized Cloud Configuration & Sync Script -->
+    <script src="config.js"></script>
+    <!-- Chart.js CDN for visual graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+   <meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+</head>
+<body class="bg-[#F8F9FA] text-[#212529] font-sans antialiased pb-12">
+
+    <!-- Header -->
+    <header class="bg-[#212529] text-white sticky top-0 z-50 shadow-md">
+        <div class="max-w-md mx-auto px-4 py-3 flex justify-between items-center">
+            <a href="index.html" class="text-sm text-gray-300 hover:text-white">&larr; Back to Dashboard</a>
+            <h1 id="pageTitle" class="text-base font-bold">Trip Settlement & Report</h1>
+            <button onclick="toggleTripStatus()" id="btnToggleTripState" class="text-xs text-yellow-400 font-bold hover:underline hidden">Close Trip</button>
+        </div>
+    </header>
+
+    <main class="max-w-md mx-auto p-4 space-y-4">
+
+        <!-- Selected Trip Banner -->
+        <div class="bg-blue-50 border border-blue-200 rounded-2xl p-3 flex justify-between items-center shadow-sm">
+            <div>
+                <p class="text-[10px] font-bold text-blue-600 tracking-wider">REPORT FOR TRIP</p>
+                <p id="selectedTripName" class="text-sm font-extrabold text-blue-900">Loading Trip...</p>
+            </div>
+            <button onclick="promptTripSelection(true)" class="bg-[#0D6EFD] text-white font-bold px-3 py-1.5 rounded-xl text-xs shadow active:opacity-90">Switch Trip</button>
+        </div>
+
+        <!-- Overview Summary Cards -->
+        <div class="grid grid-cols-2 gap-3">
+            <div class="bg-white p-3.5 rounded-2xl border border-gray-100 shadow-sm">
+                <span class="text-xs text-gray-500 font-semibold">Total Spend</span>
+                <p id="tvReportTotalSpend" class="text-lg font-extrabold text-black mt-0.5">₹0.00</p>
+            </div>
+            <div class="bg-white p-3.5 rounded-2xl border border-gray-100 shadow-sm">
+                <span class="text-xs text-gray-500 font-semibold">Per Capita Share</span>
+                <p id="tvReportPerCapita" class="text-lg font-extrabold text-[#0D6EFD] mt-0.5">₹0.00</p>
+            </div>
+        </div>
+
+        <!-- Optimized Settlements Section ("Who pays whom") -->
+        <section class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
+            <h2 class="text-sm font-bold text-black border-b border-gray-100 pb-2">💳 Optimized Settlements</h2>
+            <div id="containerSettlements" class="space-y-2">
+                <p class="text-xs text-gray-400">Loading settlements...</p>
+            </div>
+        </section>
+
+        <!-- Participant Balances Section -->
+        <section class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
+            <h2 class="text-sm font-bold text-black border-b border-gray-100 pb-2">👤 Participant Balances</h2>
+            <div id="containerParticipantBalances" class="space-y-2">
+                <p class="text-xs text-gray-400">Loading participant balances...</p>
+            </div>
+        </section>
+
+        <!-- Category Breakdown Graph Section -->
+        <section class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-4">
+            <h2 class="text-sm font-bold text-black border-b border-gray-100 pb-2">📊 Spend by Category</h2>
+            <div class="w-full flex justify-center py-2">
+                <div class="w-52 h-52 relative">
+                    <canvas id="categoryPieChart"></canvas>
+                </div>
+            </div>
+            <div id="containerCategoryGraph" class="space-y-3 pt-2 border-t border-gray-100">
+                <p class="text-xs text-gray-400">Loading category data...</p>
+            </div>
+        </section>
+
+        <!-- Family Spend Breakdown Section -->
+        <section class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-4">
+            <h2 class="text-sm font-bold text-black border-b border-gray-100 pb-2">👨‍👩‍👧‍👦 Spend by Family Group</h2>
+            <div class="w-full flex justify-center py-2">
+                <div class="w-52 h-52 relative">
+                    <canvas id="familyPieChart"></canvas>
+                </div>
+            </div>
+            <div id="containerFamilyGraph" class="space-y-3 pt-2 border-t border-gray-100">
+                <p class="text-xs text-gray-400">Loading family data...</p>
+            </div>
+        </section>
+
+        <!-- Individual Spend Breakdown Section -->
+        <section class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-4">
+            <h2 class="text-sm font-bold text-black border-b border-gray-100 pb-2">🏷️ Spend by Individual</h2>
+            <div class="w-full flex justify-center py-2">
+                <div class="w-52 h-52 relative">
+                    <canvas id="individualPieChart"></canvas>
+                </div>
+            </div>
+            <div id="containerIndividualGraph" class="space-y-3 pt-2 border-t border-gray-100">
+                <p class="text-xs text-gray-400">Loading individual data...</p>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Report Calculation & Chart Script -->
+    <script>
+        let currentTrip = null;
+        let categoryPieChart = null;
+        let familyPieChart = null;
+        let individualPieChart = null;
+
+        const paletteColors = [
+            '#0D6EFD', '#198754', '#FFC107', '#DC3545', '#6610F2', 
+            '#FD7E14', '#20C997', '#6C757D', '#0dcaf0', '#d63384'
+        ];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (typeof syncFromCloud === 'function') {
+                await syncFromCloud();
+            }
+
+            const trips = JSON.parse(localStorage.getItem('trips') || '[]');
+            if (trips.length === 0) {
+                alert('No trips found. Please create a trip first.');
+                window.location.href = 'index.html';
+                return;
+            }
+            promptTripSelection();
+        });
+
+        function promptTripSelection(forcedPrompt = false) {
+            const trips = JSON.parse(localStorage.getItem('trips') || '[]');
+            if (trips.length === 0) {
+                alert('No trips found. Please create a trip from the dashboard first.');
+                window.location.href = 'index.html';
+                return;
+            }
+
+            const activeTrips = trips.filter(t => !t.isClosed);
+            const targetTrips = trips; // Show all trips (active & closed)
+
+            // If there's only 1 trip total and not forced, select it automatically
+            if (targetTrips.length === 1 && !forcedPrompt) {
+                currentTrip = targetTrips[0];
+                localStorage.setItem('activeTripId', currentTrip.id);
+                loadReportData();
+                return;
+            }
+
+            // Check if there are no active trips
+            let promptHeader = 'Select Trip Number:';
+            if (activeTrips.length === 0) {
+                promptHeader = 'No active trips found. Choose from your closed trips:';
+            }
+
+            const tripNames = targetTrips.map((t, idx) => `${idx + 1}. ${t.destination} (${t.nature}) ${t.isClosed ? '[CLOSED]' : '[ACTIVE]'}`).join('\n');
+            const selection = prompt(`${promptHeader}\n${tripNames}`, '1');
+            
+            if (selection === null) {
+                if (!currentTrip && targetTrips.length > 0) {
+                    currentTrip = targetTrips[0];
+                    localStorage.setItem('activeTripId', currentTrip.id);
+                    loadReportData();
+                }
+                return;
+            }
+
+            const index = parseInt(selection) - 1;
+
+            if (!isNaN(index) && targetTrips[index]) {
+                currentTrip = targetTrips[index];
+                localStorage.setItem('activeTripId', currentTrip.id);
+                loadReportData();
+            } else if (!currentTrip && targetTrips.length > 0) {
+                currentTrip = targetTrips[0];
+                localStorage.setItem('activeTripId', currentTrip.id);
+                loadReportData();
+            }
+        }
+
+        function loadReportData() {
+            if (!currentTrip) {
+                alert('No trip selected.');
+                return;
+            }
+
+            document.getElementById('selectedTripName').textContent = `${currentTrip.destination} (${currentTrip.nature})${currentTrip.isClosed ? ' [CLOSED]' : ''}`;
+            
+            const toggleBtn = document.getElementById('btnToggleTripState');
+            toggleBtn.classList.remove('hidden');
+            if (currentTrip.isClosed) {
+                toggleBtn.textContent = 'Reactivate Trip';
+                document.getElementById('pageTitle').textContent = 'Closed Trip Report';
+            } else {
+                toggleBtn.textContent = 'Close Trip';
+                document.getElementById('pageTitle').textContent = 'Trip Settlement & Report';
+            }
+
+            const allExpenses = JSON.parse(localStorage.getItem('expenses') || '[]');
+            const expenses = allExpenses.filter(e => e.tripId == currentTrip.id || !e.tripId);
+            
+            const allParticipants = JSON.parse(localStorage.getItem('participants') || '[]');
+            const tripMappings = JSON.parse(localStorage.getItem('tripParticipants') || '{}');
+            const assignedIds = tripMappings[currentTrip.id];
+
+            const participants = assignedIds 
+                ? allParticipants.filter(p => assignedIds.includes(p.id))
+                : allParticipants;
+
+            const totalSpend = expenses.reduce((sum, e) => sum + e.amount, 0);
+            const perCapita = participants.length > 0 ? totalSpend / participants.length : 0;
+
+            document.getElementById('tvReportTotalSpend').textContent = `₹${totalSpend.toFixed(2)}`;
+            document.getElementById('tvReportPerCapita').textContent = `₹${perCapita.toFixed(2)}`;
+
+            // 1. Category Calculations
+            const categoryTotals = {};
+            expenses.forEach(e => {
+                const cat = e.category || 'Uncategorized';
+                categoryTotals[cat] = (categoryTotals[cat] || 0) + e.amount;
+            });
+            const sortedCategories = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]);
+            renderCategoryChartAndBars(sortedCategories, totalSpend);
+
+            // 2. Paid / Owed Maps & Individual / Family Spend Calculations
+            const paidMap = {};
+            const owedMap = {};
+            const individualSpendMap = {};
+            const familySpendMap = {};
+
+            participants.forEach(p => {
+                paidMap[p.name] = 0;
+                owedMap[p.name] = 0;
+                individualSpendMap[p.name] = 0;
+                const fam = p.family || 'Unassigned';
+                familySpendMap[fam] = 0;
+            });
+
+            expenses.forEach(e => {
+                const payer = e.payer || 'Self / Unassigned';
+                paidMap[payer] = (paidMap[payer] || 0) + e.amount;
+
+                let included = [];
+                if (e.splitType === 'custom' && e.includedParticipants && e.includedParticipants.length > 0) {
+                    included = e.includedParticipants;
+                } else {
+                    included = participants.map(p => p.name);
+                }
+
+                if (included.length > 0) {
+                    const sharePerPerson = e.amount / included.length;
+                    included.forEach(memberName => {
+                        owedMap[memberName] = (owedMap[memberName] || 0) + sharePerPerson;
+                        individualSpendMap[memberName] = (individualSpendMap[memberName] || 0) + sharePerPerson;
+
+                        // Find family for this member
+                        const partObj = participants.find(p => p.name === memberName);
+                        const famName = partObj ? (partObj.family || 'Unassigned') : 'Unassigned';
+                        familySpendMap[famName] = (familySpendMap[famName] || 0) + sharePerPerson;
+                    });
+                }
+            });
+
+            const sortedFamilies = Object.entries(familySpendMap).sort((a, b) => b[1] - a[1]);
+            renderFamilyChartAndBars(sortedFamilies, totalSpend);
+
+            const sortedIndividuals = Object.entries(individualSpendMap).sort((a, b) => b[1] - a[1]);
+            renderIndividualChartAndBars(sortedIndividuals, totalSpend);
+
+            renderParticipantBalances(participants, paidMap, owedMap);
+            renderOptimizedSettlements(participants, paidMap, owedMap);
+        }
+
+        function renderCategoryChartAndBars(sortedCategories, totalSpend) {
+            const container = document.getElementById('containerCategoryGraph');
+            container.innerHTML = '';
+            const ctx = document.getElementById('categoryPieChart').getContext('2d');
+
+            if (sortedCategories.length === 0) {
+                container.innerHTML = '<p class="text-xs text-gray-400">No category expenses recorded.</p>';
+                if (categoryPieChart) categoryPieChart.destroy();
+                return;
+            }
+
+            const labels = sortedCategories.map(item => item[0]);
+            const dataValues = sortedCategories.map(item => item[1]);
+
+            if (categoryPieChart) categoryPieChart.destroy();
+
+            categoryPieChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: dataValues,
+                        backgroundColor: paletteColors.slice(0, labels.length),
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '65%' }
+            });
+
+            sortedCategories.forEach(([category, amount], idx) => {
+                const percentage = totalSpend > 0 ? Math.round((amount / totalSpend) * 100) : 0;
+                const colorCode = paletteColors[idx % paletteColors.length];
+
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'space-y-1';
+                itemDiv.innerHTML = `
+                    <div class="flex justify-between items-center text-xs font-bold">
+                        <span class="flex items-center space-x-1.5 text-gray-800">
+                            <span class="w-2.5 h-2.5 rounded-full inline-block" style="background-color: ${colorCode}"></span>
+                            <span>${category}</span>
+                        </span>
+                        <span class="text-[#0D6EFD]">₹${amount.toFixed(2)} (${percentage}%)</span>
+                    </div>
+                    <div class="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                        <div class="h-full rounded-full" style="width: ${percentage}%; background-color: ${colorCode}"></div>
+                    </div>
+                `;
+                container.appendChild(itemDiv);
+            });
+        }
+
+        function renderFamilyChartAndBars(sortedFamilies, totalSpend) {
+            const container = document.getElementById('containerFamilyGraph');
+            container.innerHTML = '';
+            const ctx = document.getElementById('familyPieChart').getContext('2d');
+
+            if (sortedFamilies.length === 0 || totalSpend === 0) {
+                container.innerHTML = '<p class="text-xs text-gray-400">No family data available.</p>';
+                if (familyPieChart) familyPieChart.destroy();
+                return;
+            }
+
+            const labels = sortedFamilies.map(item => item[0]);
+            const dataValues = sortedFamilies.map(item => item[1]);
+
+            if (familyPieChart) familyPieChart.destroy();
+
+            familyPieChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: dataValues,
+                        backgroundColor: paletteColors.slice(0, labels.length),
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '65%' }
+            });
+
+            sortedFamilies.forEach(([family, amount], idx) => {
+                const percentage = totalSpend > 0 ? Math.round((amount / totalSpend) * 100) : 0;
+                const colorCode = paletteColors[idx % paletteColors.length];
+
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'space-y-1';
+                itemDiv.innerHTML = `
+                    <div class="flex justify-between items-center text-xs font-bold">
+                        <span class="flex items-center space-x-1.5 text-gray-800">
+                            <span class="w-2.5 h-2.5 rounded-full inline-block" style="background-color: ${colorCode}"></span>
+                            <span>${family}</span>
+                        </span>
+                        <span class="text-[#0D6EFD]">₹${amount.toFixed(2)} (${percentage}%)</span>
+                    </div>
+                    <div class="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                        <div class="h-full rounded-full" style="width: ${percentage}%; background-color: ${colorCode}"></div>
+                    </div>
+                `;
+                container.appendChild(itemDiv);
+            });
+        }
+
+        function renderIndividualChartAndBars(sortedIndividuals, totalSpend) {
+            const container = document.getElementById('containerIndividualGraph');
+            container.innerHTML = '';
+            const ctx = document.getElementById('individualPieChart').getContext('2d');
+
+            if (sortedIndividuals.length === 0 || totalSpend === 0) {
+                container.innerHTML = '<p class="text-xs text-gray-400">No individual data available.</p>';
+                if (individualPieChart) individualPieChart.destroy();
+                return;
+            }
+
+            const labels = sortedIndividuals.map(item => item[0]);
+            const dataValues = sortedIndividuals.map(item => item[1]);
+
+            if (individualPieChart) individualPieChart.destroy();
+
+            individualPieChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: dataValues,
+                        backgroundColor: paletteColors.slice(0, labels.length),
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '65%' }
+            });
+
+            sortedIndividuals.forEach(([person, amount], idx) => {
+                const percentage = totalSpend > 0 ? Math.round((amount / totalSpend) * 100) : 0;
+                const colorCode = paletteColors[idx % paletteColors.length];
+
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'space-y-1';
+                itemDiv.innerHTML = `
+                    <div class="flex justify-between items-center text-xs font-bold">
+                        <span class="flex items-center space-x-1.5 text-gray-800">
+                            <span class="w-2.5 h-2.5 rounded-full inline-block" style="background-color: ${colorCode}"></span>
+                            <span>${person}</span>
+                        </span>
+                        <span class="text-[#0D6EFD]">₹${amount.toFixed(2)} (${percentage}%)</span>
+                    </div>
+                    <div class="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                        <div class="h-full rounded-full" style="width: ${percentage}%; background-color: ${colorCode}"></div>
+                    </div>
+                `;
+                container.appendChild(itemDiv);
+            });
+        }
+
+        function renderParticipantBalances(participants, paidMap, owedMap) {
+            const container = document.getElementById('containerParticipantBalances');
+            container.innerHTML = '';
+
+            if (participants.length === 0) {
+                container.innerHTML = '<p class="text-xs text-gray-400">No participants assigned to this trip roster.</p>';
+                return;
+            }
+
+            participants.forEach(p => {
+                const paid = paidMap[p.name] || 0;
+                const owed = owedMap[p.name] || 0;
+                const net = paid - owed;
+
+                const card = document.createElement('div');
+                card.className = 'bg-gray-50 p-3 rounded-xl border border-gray-100 flex justify-between items-center text-xs';
+                card.innerHTML = `
+                    <div>
+                        <p class="font-bold text-black text-sm">${p.name} <span class="text-[10px] text-gray-500 font-normal">(${p.family})</span></p>
+                        <p class="text-gray-500 mt-0.5">Paid: ₹${paid.toFixed(2)} | Consumed: ₹${owed.toFixed(2)}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="font-extrabold ${net >= 0 ? 'text-[#198754]' : 'text-[#DC3545]'} text-sm">
+                            ${net >= 0 ? `+₹${net.toFixed(2)}` : `-₹${Math.abs(net).toFixed(2)}`}
+                        </p>
+                        <p class="text-[10px] text-gray-400 font-semibold">${net >= 0 ? 'Gets back' : 'Owes'}</p>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function renderOptimizedSettlements(participants, paidMap, owedMap) {
+            const container = document.getElementById('containerSettlements');
+            container.innerHTML = '';
+
+            if (participants.length === 0) {
+                container.innerHTML = '<p class="text-xs text-gray-400">No participants to calculate settlements for.</p>';
+                return;
+            }
+
+            const balances = {};
+            participants.forEach(p => {
+                const paid = paidMap[p.name] || 0;
+                const owed = owedMap[p.name] || 0;
+                balances[p.name] = paid - owed;
+            });
+
+            const debtors = [];
+            const creditors = [];
+
+            Object.entries(balances).forEach(([name, bal]) => {
+                if (bal < -0.01) debtors.push({ name, amount: -bal });
+                else if (bal > 0.01) creditors.push({ name, amount: bal });
+            });
+
+            const settlements = [];
+            let dIndex = 0;
+            let cIndex = 0;
+
+            while (dIndex < debtors.length && cIndex < creditors.length) {
+                const debtor = debtors[dIndex];
+                const creditor = creditors[cIndex];
+
+                const settleAmount = Math.min(debtor.amount, creditor.amount);
+                if (settleAmount > 0.01) {
+                    settlements.push(`<strong>${debtor.name}</strong> pays <strong>${creditor.name}</strong> <span class="text-blue-600">₹${settleAmount.toFixed(2)}</span>`);
+                }
+
+                debtor.amount -= settleAmount;
+                creditor.amount -= settleAmount;
+
+                if (debtor.amount <= 0.01) dIndex++;
+                if (creditor.amount <= 0.01) cIndex++;
+            }
+
+            if (settlements.length === 0) {
+                container.innerHTML = '<p class="text-xs text-[#198754] font-bold">All balances are settled up!</p>';
+            } else {
+                settlements.forEach(s => {
+                    const row = document.createElement('div');
+                    row.className = 'bg-blue-50/50 border border-blue-100 p-2.5 rounded-xl text-xs text-gray-800 flex items-center space-x-2';
+                    row.innerHTML = `<span class="text-base">💸</span> <span>${s}</span>`;
+                    container.appendChild(row);
+                });
+            }
+        }
+
+        function toggleTripStatus() {
+            if (!currentTrip) return;
+
+            let trips = JSON.parse(localStorage.getItem('trips') || '[]');
+            trips = trips.map(t => t.id == currentTrip.id ? { ...t, isClosed: !t.isClosed } : t);
+            localStorage.setItem('trips', JSON.stringify(trips));
+
+            currentTrip.isClosed = !currentTrip.isClosed;
+
+            // Sync trip status change to GitHub Gist cloud backend via config.js
+            if (typeof syncToCloud === 'function') {
+                syncToCloud();
+            }
+
+            loadReportData();
+            alert(currentTrip.isClosed ? 'Trip closed and archived successfully!' : 'Trip is now active again!');
+        }
+    </script>
+</body>
+</html>

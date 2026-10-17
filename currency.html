@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Select Currency - Trip Expense Manager</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Centralized Cloud Configuration & Sync Script -->
+    <script src="config.js"></script>
+   <meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+</head>
+<body class="bg-[#F8F9FA] text-[#212529] font-sans antialiased pb-12">
+
+    <!-- Header -->
+    <header class="bg-[#212529] text-white sticky top-0 z-50 shadow-md">
+        <div class="max-w-md mx-auto px-4 py-3 flex justify-between items-center">
+            <a href="index.html" class="text-sm text-gray-300 hover:text-white">&larr; Back to Dashboard</a>
+            <h1 class="text-base font-bold">Currency Settings</h1>
+            <div class="w-12"></div>
+        </div>
+    </header>
+
+    <main class="max-w-md mx-auto p-4 space-y-4">
+
+        <!-- Select Currency Card -->
+        <section class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
+            <h2 class="text-xs font-bold text-gray-400 tracking-wider">CHOOSE DEFAULT CURRENCY</h2>
+            
+            <div class="space-y-2" id="currencyOptions">
+                <!-- Populated dynamically -->
+            </div>
+
+            <button id="btnSaveCurrency" class="w-full bg-[#0D6EFD] text-white font-bold py-3 rounded-xl shadow-md active:opacity-90 transition text-sm mt-2">
+                Save Currency Preference
+            </button>
+        </section>
+
+    </main>
+
+    <!-- Currency Logic Script -->
+    <script>
+        const currencies = [
+            { symbol: '₹', name: 'Indian Rupee (INR)' },
+            { symbol: '$', name: 'US Dollar (USD)' },
+            { symbol: '€', name: 'Euro (EUR)' },
+            { symbol: '£', name: 'British Pound (GBP)' },
+            { symbol: 'A$', name: 'Australian Dollar (AUD)' },
+            { symbol: 'C$', name: 'Canadian Dollar (CAD)' }
+        ];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (typeof syncFromCloud === 'function') {
+                await syncFromCloud();
+            }
+            renderCurrencies();
+
+            document.getElementById('btnSaveCurrency').addEventListener('click', () => {
+                const selected = document.querySelector('input[name="currency"]:checked');
+                if (!selected) {
+                    alert('Please select a currency');
+                    return;
+                }
+                localStorage.setItem('preferredCurrency', selected.value);
+
+                // Sync currency preference to GitHub Gist cloud backend via config.js
+                if (typeof syncToCloud === 'function') {
+                    syncToCloud();
+                }
+
+                alert('Currency preference saved successfully!');
+                window.location.href = 'index.html';
+            });
+        });
+
+        function renderCurrencies() {
+            const current = localStorage.getItem('preferredCurrency') || '₹';
+            const container = document.getElementById('currencyOptions');
+            container.innerHTML = '';
+
+            currencies.forEach(c => {
+                const isChecked = c.symbol === current ? 'checked' : '';
+                const label = document.createElement('label');
+                label.className = 'flex items-center justify-between bg-gray-50 p-3.5 rounded-xl border border-gray-200 cursor-pointer hover:bg-gray-100 transition';
+                label.innerHTML = `
+                    <span class="text-sm font-semibold text-gray-800">${c.name}</span>
+                    <div class="flex items-center space-x-3">
+                        <span class="text-base font-bold text-black">${c.symbol}</span>
+                        <input type="radio" name="currency" value="${c.symbol}" ${isChecked} class="w-4 h-4 text-blue-600">
+                    </div>
+                `;
+                container.appendChild(label);
+            });
+        }
+    </script>
+</body>
+</html>

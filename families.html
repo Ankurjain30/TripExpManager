@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Manage Families - Trip Expense Manager</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Centralized Cloud Configuration & Sync Script -->
+    <script src="config.js"></script>
+   <meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+</head>
+<body class="bg-[#F8F9FA] text-[#212529] font-sans antialiased pb-28 min-h-screen relative">
+
+    <!-- Header -->
+    <header class="bg-[#212529] text-white sticky top-0 z-50 shadow-md">
+        <div class="max-w-md mx-auto px-4 py-3 flex justify-between items-center">
+            <a href="index.html" class="text-sm text-gray-300 hover:text-white">&larr; Back to Dashboard</a>
+            <h1 id="pageTitle" class="text-base font-bold">Manage Families</h1>
+            <div class="w-12"></div>
+        </div>
+    </header>
+
+    <main class="max-w-md mx-auto p-4 space-y-4">
+
+        <!-- Section Title Header -->
+        <h2 id="tvManageFamilyHeader" class="text-base font-bold text-[#212529] px-1 pb-1">
+            Families & Members Directory
+        </h2>
+
+        <!-- Family List Container -->
+        <div id="rvFamilies" class="space-y-3 pb-20">
+            <p class="text-xs text-gray-500 bg-white p-4 rounded-xl border border-gray-100 text-center">Loading family groups...</p>
+        </div>
+
+    </main>
+
+    <!-- Floating Action Button to Add Family Group -->
+    <button onclick="addNewFamily()" class="fixed bottom-6 right-6 w-14 h-14 bg-[#0D6EFD] text-white rounded-full shadow-lg flex items-center justify-center text-2xl font-bold active:scale-95 transition z-50 cursor-pointer" title="Add Family">
+        +
+    </button>
+
+    <!-- Modal for Member Creation -->
+    <div id="genericModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-xl">
+            <h3 id="modalTitle" class="text-base font-bold text-black">Title</h3>
+            <div id="modalBody" class="space-y-3"></div>
+            <div class="flex space-x-2 pt-2">
+                <button id="modalCancel" class="w-1/2 bg-gray-100 text-gray-700 font-bold py-2.5 rounded-xl text-sm">Cancel</button>
+                <button id="modalConfirm" class="w-1/2 bg-[#0D6EFD] text-white font-bold py-2.5 rounded-xl text-sm">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Family Management Logic Script -->
+    <script>
+        const selectedMemberIds = {};
+        const expandedFamilies = {};
+        let targetTripId = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                if (typeof syncFromCloud === 'function') {
+                    await syncFromCloud();
+                }
+
+                const urlParams = new URLSearchParams(window.location.search);
+                targetTripId = urlParams.get('tripId') || localStorage.getItem('activeTripId');
+
+                if (urlParams.get('tripId')) {
+                    document.getElementById('pageTitle').textContent = 'Select Family Members for Trip';
+                } else {
+                    document.getElementById('pageTitle').textContent = 'Manage Families';
+                }
+
+                loadFamiliesAndMembers();
+
+                document.getElementById('modalCancel').addEventListener('click', () => {
+                    document.getElementById('genericModal').classList.add('hidden');
+                });
+            } catch (err) {
+                console.error("Initialization error:", err);
+            }
+        });
+
+        function getParticipants() {
+            try {
+                return JSON.parse(localStorage.getItem('participants') || '[]');
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function getFamilies() {
+            let familiesList = [];
+            try {
+                const raw = localStorage.getItem('families');
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed)) {
+                        familiesList = parsed.map((item, idx) => {
+                            if (typeof item === 'string') {
+                                return { id: Date.now() + idx, familyName: item.trim() };
+                            }
+                            return item;
+                        });
+                    }
+                }
+            } catch (e) {}
+
+            const participants = getParticipants();
+            participants.forEach(p => {
+                if (p.family && typeof p.family === 'string' && p.family !== 'Unassigned') {
+                    const found = familiesList.find(f => f.familyName.toLowerCase() === p.family.toLowerCase());
+                    if (!found) {
+                        familiesList.push({ id: p.familyId || (Date.now() + Math.floor(Math.random()*1000)), familyName: p.family.trim() });
+                    }
+                }
+            });
+
+            localStorage.setItem('families', JSON.stringify(familiesList));
+            return familiesList;
+        }
+
+        function addNewFamily() {
+            const familyName = prompt('Enter new family group name (e.g. Sharma Family):');
+            if (familyName && familyName.trim()) {
+                const name = familyName.trim();
+                let families = getFamilies();
+                
+                if (!families.some(f => f.familyName.toLowerCase() === name.toLowerCase())) {
+                    const newFamily = { id: Date.now(), familyName: name };
+                    families.push(newFamily);
+                    localStorage.setItem('families', JSON.stringify(families));
+
+                    // Push updates to GitHub Gist cloud backend via config.js
+                    if (typeof syncToCloud === 'function') {
+                        syncToCloud();
+                    }
+
+                    expandedFamilies[newFamily.id] = true;
+                    loadFamiliesAndMembers();
+                    alert(`Family "${name}" created successfully!`);
+                } else {
+                    alert('A family with this name already exists.');
+                }
+            }
+        }
+
+        function loadFamiliesAndMembers() {
+            try {
+                const families = getFamilies();
+                const participants = getParticipants();
+                const container = document.getElementById('rvFamilies');
+                container.innerHTML = '';
+
+                if (families.length === 0) {
+                    container.innerHTML = '<p class="text-xs text-gray-500 bg-white p-4 rounded-xl border border-gray-100 text-center">No family groups found. Tap (+) to create one.</p>';
+                    return;
+                }
+
+                families.forEach((family) => {
+                    const familyMembers = participants.filter(p => p.familyId == family.id || (!p.familyId && p.family === family.familyName));
+                    const memberNamesText = familyMembers.length === 0 ? 'No members added yet' : familyMembers.map(m => m.name).join(', ');
+                    const isExpanded = expandedFamilies[family.id] === true;
+
+                    const card = document.createElement('div');
+                    card.className = 'bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3';
+                    
+                    // Main Header Row (Click to expand)
+                    const headerDiv = document.createElement('div');
+                    headerDiv.className = 'flex justify-between items-center cursor-pointer select-none';
+                    headerDiv.innerHTML = `
+                        <div>
+                            <h3 class="text-sm font-bold text-black">${family.familyName}</h3>
+                            <p class="text-xs text-gray-400 mt-0.5">Members: ${memberNamesText}</p>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button class="options-btn text-gray-400 hover:text-black p-1 text-sm font-bold">⋮</button>
+                            <span class="text-xs text-gray-400 font-bold">${isExpanded ? '▲' : '▼'}</span>
+                        </div>
+                    `;
+                    headerDiv.onclick = () => toggleExpand(family.id);
+                    headerDiv.querySelector('.options-btn').onclick = (e) => {
+                        e.stopPropagation();
+                        showOptionsMenu(family.id, family.familyName);
+                    };
+                    card.appendChild(headerDiv);
+
+                    // Expandable Body Container
+                    const bodyDiv = document.createElement('div');
+                    bodyDiv.className = `${isExpanded ? '' : 'hidden'} pt-3 border-t border-gray-100 space-y-3`;
+
+                    if (familyMembers.length > 0) {
+                        const selectAllDiv = document.createElement('div');
+                        selectAllDiv.className = 'bg-gray-100 p-2.5 rounded-xl flex items-center justify-between text-xs font-bold text-gray-700';
+                        selectAllDiv.innerHTML = `
+                            <label class="flex items-center space-x-2 cursor-pointer w-full">
+                                <input type="checkbox" class="w-4 h-4 text-blue-600 rounded select-all-chk">
+                                <span>Select Entire Family (${familyMembers.length})</span>
+                            </label>
+                        `;
+                        selectAllDiv.querySelector('input').onchange = (e) => toggleSelectAllFamily(family.id, e.target.checked);
+                        bodyDiv.appendChild(selectAllDiv);
+                    }
+
+                    const membersListDiv = document.createElement('div');
+                    membersListDiv.className = 'space-y-2';
+
+                    if (familyMembers.length > 0) {
+                        familyMembers.forEach(member => {
+                            const isChecked = selectedMemberIds[member.id] ? 'checked' : '';
+                            const memberRow = document.createElement('div');
+                            memberRow.className = 'flex justify-between items-center bg-gray-50 p-2.5 rounded-xl border border-gray-100 text-xs';
+                            memberRow.innerHTML = `
+                                <label class="flex items-center space-x-2 cursor-pointer flex-1">
+                                    <input type="checkbox" ${isChecked} class="w-4 h-4 text-blue-600 rounded member-chk">
+                                    <span class="font-bold text-black">${member.name} (${member.category || 'Adult'})</span>
+                                </label>
+                                <button class="bg-[#DC3545] text-white font-bold px-2.5 py-1 rounded-lg text-[11px] shadow-sm remove-btn">Remove</button>
+                            `;
+                            memberRow.querySelector('.member-chk').onchange = (e) => {
+                                selectedMemberIds[member.id] = e.target.checked;
+                            };
+                            memberRow.querySelector('.remove-btn').onclick = () => removeMember(member.id);
+                            membersListDiv.appendChild(memberRow);
+                        });
+                    } else {
+                        membersListDiv.innerHTML = '<p class="text-xs text-gray-400 text-center py-1">No members in this family.</p>';
+                    }
+                    bodyDiv.appendChild(membersListDiv);
+
+                    // Action Buttons Row
+                    const actionsDiv = document.createElement('div');
+                    actionsDiv.className = 'flex space-x-2 pt-1';
+                    actionsDiv.innerHTML = `
+                        <button class="flex-1 bg-gray-50 border border-gray-200 text-gray-700 font-bold py-2 rounded-xl text-xs hover:bg-gray-100 add-member-btn">+ Add Member</button>
+                        <button class="flex-1 bg-[#0D6EFD] text-white font-bold py-2 rounded-xl text-xs shadow-sm hover:opacity-90 map-btn">Map Checked to Trip</button>
+                    `;
+                    actionsDiv.querySelector('.add-member-btn').onclick = () => showAddMemberDialog(family.id, family.familyName);
+                    actionsDiv.querySelector('.map-btn').onclick = () => mapCheckedMembers(family.id);
+                    bodyDiv.appendChild(actionsDiv);
+
+                    card.appendChild(bodyDiv);
+                    container.appendChild(card);
+                });
+            } catch (renderErr) {
+                console.error("Render error:", renderErr);
+            }
+        }
+
+        function toggleSelectAllFamily(familyId, isChecked) {
+            const participants = getParticipants();
+            participants.forEach(p => {
+                if (p.familyId == familyId || p.family === familyId) {
+                    selectedMemberIds[p.id] = isChecked;
+                }
+            });
+            loadFamiliesAndMembers();
+        }
+
+        function toggleExpand(familyId) {
+            expandedFamilies[familyId] = !expandedFamilies[familyId];
+            loadFamiliesAndMembers();
+        }
+
+        function showOptionsMenu(familyId, familyName) {
+            const choice = prompt(`Options for "${familyName}":\n1. Edit Family Name\n2. Delete Family Group\n\nEnter 1 or 2:`, '1');
+            if (choice === '1') {
+                const newName = prompt('Enter new family name:', familyName);
+                if (newName && newName.trim() && newName.trim() !== familyName) {
+                    const trimmed = newName.trim();
+                    
+                    let families = getFamilies();
+                    families = families.map(f => f.id == familyId ? { ...f, familyName: trimmed } : f);
+                    localStorage.setItem('families', JSON.stringify(families));
+
+                    let participants = getParticipants();
+                    participants = participants.map(p => (p.familyId == familyId || p.family === familyName) ? { ...p, familyId: familyId, family: trimmed } : p);
+                    localStorage.setItem('participants', JSON.stringify(participants));
+
+                    if (typeof syncToCloud === 'function') {
+                        syncToCloud();
+                    }
+
+                    loadFamiliesAndMembers();
+                    alert('Family renamed successfully!');
+                }
+            } else if (choice === '2') {
+                if (confirm(`Delete family group "${familyName}"? Members will be unassigned.`)) {
+                    let families = getFamilies().filter(f => f.id != familyId);
+                    localStorage.setItem('families', JSON.stringify(families));
+
+                    let participants = getParticipants();
+                    participants = participants.map(p => (p.familyId == familyId || p.family === familyName) ? { ...p, familyId: null, family: 'Unassigned' } : p);
+                    localStorage.setItem('participants', JSON.stringify(participants));
+
+                    if (typeof syncToCloud === 'function') {
+                        syncToCloud();
+                    }
+
+                    loadFamiliesAndMembers();
+                    alert('Family deleted.');
+                }
+            }
+        }
+
+        function removeMember(memberId) {
+            if (confirm('Remove this member from family?')) {
+                let participants = getParticipants();
+                participants = participants.map(p => p.id === memberId ? { ...p, familyId: null, family: 'Unassigned' } : p);
+                localStorage.setItem('participants', JSON.stringify(participants));
+                delete selectedMemberIds[memberId];
+
+                if (typeof syncToCloud === 'function') {
+                    syncToCloud();
+                }
+
+                loadFamiliesAndMembers();
+            }
+        }
+
+        function showAddMemberDialog(familyId, familyName) {
+            const modal = document.getElementById('genericModal');
+            document.getElementById('modalTitle').textContent = `Add Member to ${familyName}`;
+            const body = document.getElementById('modalBody');
+
+            const participants = getParticipants();
+            const unassignedParticipants = participants.filter(p => !p.familyId || p.family === 'Unassigned');
+
+            let existingOptionsHtml = '';
+            if (unassignedParticipants.length > 0) {
+                existingOptionsHtml = `
+                    <div class="border-b border-gray-100 pb-3 mb-2">
+                        <label class="block text-xs font-bold text-gray-700 mb-1">Option 1: Add Existing Participant</label>
+                        <select id="selectExistingParticipant" class="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-semibold focus:outline-none focus:border-black">
+                            <option value="">-- Choose existing participant --</option>
+                            ${unassignedParticipants.map(p => `<option value="${p.id}">${p.name} (${p.category || 'Adult'})</option>`).join('')}
+                        </select>
+                    </div>
+                `;
+            }
+
+            body.innerHTML = `
+                ${existingOptionsHtml}
+                <div class="space-y-2">
+                    <label class="block text-xs font-bold text-gray-700 mb-1">${unassignedParticipants.length > 0 ? 'Option 2: Or Create New Member' : 'Create New Member'}</label>
+                    <input type="text" id="inputMemberName" placeholder="e.g. Rahul Sharma" class="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-semibold focus:outline-none focus:border-black">
+                    <select id="selectMemberCategory" class="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-semibold focus:outline-none focus:border-black">
+                        <option value="Adult">Adult</option>
+                        <option value="Child">Child</option>
+                        <option value="Senior">Senior</option>
+                    </select>
+                </div>
+            `;
+
+            document.getElementById('modalConfirm').onclick = () => {
+                const existingSelect = document.getElementById('selectExistingParticipant');
+                const selectedExistingId = existingSelect ? existingSelect.value : '';
+                
+                const nameInput = document.getElementById('inputMemberName').value.trim();
+                const category = document.getElementById('selectMemberCategory').value;
+
+                let freshParticipants = getParticipants();
+
+                if (selectedExistingId) {
+                    freshParticipants = freshParticipants.map(p => p.id == selectedExistingId ? {
+                        ...p,
+                        familyId: familyId,
+                        family: familyName
+                    } : p);
+
+                    localStorage.setItem('participants', JSON.stringify(freshParticipants));
+                    
+                    if (typeof syncToCloud === 'function') {
+                        syncToCloud();
+                    }
+
+                    modal.classList.add('hidden');
+                    expandedFamilies[familyId] = true;
+                    loadFamiliesAndMembers();
+                    alert(`Existing participant added to ${familyName}!`);
+
+                } else if (nameInput) {
+                    const newId = Date.now() + Math.floor(Math.random() * 1000);
+                    freshParticipants.push({ 
+                        id: newId, 
+                        name: nameInput, 
+                        familyId: familyId, 
+                        family: familyName, 
+                        category: category 
+                    });
+                    
+                    localStorage.setItem('participants', JSON.stringify(freshParticipants));
+
+                    if (typeof syncToCloud === 'function') {
+                        syncToCloud();
+                    }
+
+                    modal.classList.add('hidden');
+                    expandedFamilies[familyId] = true;
+                    loadFamiliesAndMembers();
+                    alert(`${nameInput} created and added to ${familyName}!`);
+
+                } else {
+                    alert('Please select an existing participant or enter a new member name.');
+                }
+            };
+
+            modal.classList.remove('hidden');
+        }
+
+        function mapCheckedMembers(familyId) {
+            const checkedIds = Object.keys(selectedMemberIds)
+                .filter(id => selectedMemberIds[id] === true)
+                .map(id => Number(id));
+
+            if (checkedIds.length === 0) {
+                alert('Please check at least one member.');
+                return;
+            }
+
+            const trips = JSON.parse(localStorage.getItem('trips') || '[]');
+            if (trips.length === 0) {
+                alert('No open trips found. Please create a trip first.');
+                return;
+            }
+
+            const tripNames = trips.map((t, idx) => `${idx + 1}. ${t.destination} (${t.nature})`).join('\n');
+            const selection = prompt(`Select Trip Number to Map Members:\n${tripNames}`, '1');
+            
+            if (selection === null) return;
+
+            const index = parseInt(selection) - 1;
+            if (!isNaN(index) && trips[index]) {
+                const tripToMapId = trips[index].id;
+
+                let tripMappings = JSON.parse(localStorage.getItem('tripParticipants') || '{}');
+                let existingAssigned = tripMappings[tripToMapId] || [];
+                
+                const combinedIds = Array.from(new Set([...existingAssigned, ...checkedIds]));
+                tripMappings[tripToMapId] = combinedIds;
+                
+                localStorage.setItem('tripParticipants', JSON.stringify(tripMappings));
+                localStorage.setItem('activeTripId', tripToMapId);
+
+                if (typeof syncToCloud === 'function') {
+                    syncToCloud();
+                }
+
+                alert(`Successfully mapped ${checkedIds.length} family member(s) to trip: ${trips[index].destination}!`);
+                window.location.href = 'index.html';
+            } else {
+                alert('Invalid trip selection. Please try again.');
+            }
+        }
+    </script>
+</body>
+</html>

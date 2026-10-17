@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Manage Expenses - Trip Expense Manager</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Centralized Cloud Configuration & Sync Script -->
+    <script src="config.js"></script>
+    <meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+</head>
+<body class="bg-[#F8F9FA] text-[#212529] font-sans antialiased pb-12">
+
+    <!-- Header -->
+    <header class="bg-[#212529] text-white sticky top-0 z-50 shadow-md">
+        <div class="max-w-md mx-auto px-4 py-3 flex justify-between items-center">
+            <a href="index.html" class="text-sm text-gray-300 hover:text-white">&larr; Back to Dashboard</a>
+            <h1 id="pageTitle" class="text-base font-bold">Trip Expenses</h1>
+            <div class="w-12"></div>
+        </div>
+    </header>
+
+    <main class="max-w-md mx-auto p-4 space-y-4">
+
+        <!-- Selected Trip Banner & Switcher -->
+        <div class="bg-blue-50 border border-blue-200 rounded-2xl p-3.5 flex justify-between items-center shadow-sm">
+            <div>
+                <p class="text-[10px] font-bold text-blue-600 tracking-wider">ACTIVE TRIP</p>
+                <p id="selectedTripName" class="text-sm font-extrabold text-blue-900">Select a Trip</p>
+            </div>
+            <button onclick="promptTripSelection()" class="bg-[#0D6EFD] text-white font-bold px-3 py-1.5 rounded-xl text-xs shadow active:opacity-90">Switch Trip</button>
+        </div>
+
+        <!-- VIEW 1: Expenses Roster & History List (Default View) -->
+        <div id="viewExpenseList" class="space-y-3">
+            <div class="flex justify-between items-center px-1">
+                <h2 class="text-base font-bold text-black">Recorded Expenses</h2>
+                <button onclick="openAddForm()" class="bg-[#198754] text-white font-bold px-3.5 py-2 rounded-xl text-xs shadow hover:opacity-90">+ Add Expense</button>
+            </div>
+
+            <div id="expensesList" class="space-y-2">
+                <p class="text-xs text-gray-500 bg-white p-4 rounded-xl border border-gray-100 text-center">No expenses recorded yet.</p>
+            </div>
+        </div>
+
+        <!-- VIEW 2: Add / Edit Expense Form (Hidden by default) -->
+        <div id="viewExpenseForm" class="hidden space-y-4">
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-4">
+                <div class="flex justify-between items-center">
+                    <h2 id="formHeaderTitle" class="text-sm font-bold text-black">Add New Expense</h2>
+                    <button onclick="closeForm()" class="text-xs font-bold text-gray-500 hover:text-black">Cancel</button>
+                </div>
+
+                <input type="hidden" id="editingExpenseId" value="">
+
+                <!-- Scan Bill / Upload Receipt Banner -->
+                <section onclick="document.getElementById('receiptInputFile').click()" class="bg-[#E7F1FF] border border-[#0D6EFD] rounded-xl p-3 flex items-center space-x-3 cursor-pointer shadow-sm hover:bg-blue-100 transition">
+                    <div class="text-2xl">📷</div>
+                    <div class="flex-1">
+                        <h3 class="text-xs font-bold text-[#0D6EFD]">Attach or Scan Bill</h3>
+                        <p class="text-[10px] font-semibold text-[#343A40]">Tap to upload receipt photo</p>
+                    </div>
+                </section>
+                <input type="file" id="receiptInputFile" accept="image/*" class="hidden" onchange="handleReceiptUpload(event)">
+
+                <!-- Receipt Preview Container -->
+                <div id="receiptPreviewContainer" class="hidden relative bg-gray-50 border border-gray-200 rounded-xl p-2 flex items-center space-x-3">
+                    <img id="receiptPreviewImg" src="" alt="Receipt Preview" class="w-14 h-14 object-cover rounded-lg border border-gray-300 shadow-sm cursor-pointer" onclick="openImageModal(this.src)">
+                    <div class="flex-1">
+                        <p class="text-xs font-bold text-black">Receipt Attached</p>
+                        <p class="text-[10px] text-gray-500">Compressed & ready to save</p>
+                    </div>
+                    <button type="button" onclick="removeReceipt()" class="bg-red-50 text-red-500 text-xs font-bold px-2.5 py-1 rounded-lg hover:bg-red-100">Remove</button>
+                </div>
+                <input type="hidden" id="receiptBase64Data" value="">
+
+                <!-- Expense Date -->
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 mb-1">Expense Date</label>
+                    <input type="date" id="expenseDate" 
+                           class="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-semibold focus:outline-none focus:border-black">
+                </div>
+
+                <!-- Amount -->
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 mb-1">Amount (₹)</label>
+                    <input type="number" id="expenseAmount" placeholder="Enter amount" 
+                           class="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-semibold focus:outline-none focus:border-black">
+                </div>
+
+                <!-- Category -->
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="text-xs font-bold text-gray-700">Expense Category</label>
+                        <button id="btnAddCategoryQuick" class="text-xs font-bold text-[#0D6EFD] hover:underline">+ New Category</button>
+                    </div>
+                    <select id="expenseCategory" class="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-semibold focus:outline-none focus:border-black">
+                        <!-- Populated dynamically -->
+                    </select>
+                </div>
+
+                <!-- Description -->
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 mb-1">Description</label>
+                    <input type="text" id="expenseDescription" placeholder="e.g. Dinner at Highway Dhaba" 
+                           class="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-semibold focus:outline-none focus:border-black">
+                </div>
+
+                <!-- Paid By -->
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 mb-1">Paid By (Trip Participant)</label>
+                    <select id="expensePayer" class="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-semibold focus:outline-none focus:border-black">
+                        <!-- Populated dynamically -->
+                    </select>
+                </div>
+
+                <hr class="border-gray-200 my-2">
+
+                <!-- Split Distribution Section -->
+                <div class="space-y-2">
+                    <label class="block text-xs font-bold text-gray-700">Split Distribution</label>
+                    <div class="flex space-x-4">
+                        <label class="flex items-center space-x-2 text-xs font-bold text-gray-800 cursor-pointer">
+                            <input type="radio" name="splitType" value="equal" checked id="rbSplitEqual" class="w-4 h-4 text-blue-600">
+                            <span>Equally Among All</span>
+                        </label>
+                        <label class="flex items-center space-x-2 text-xs font-bold text-gray-800 cursor-pointer">
+                            <input type="radio" name="splitType" value="custom" id="rbSplitCustom" class="w-4 h-4 text-blue-600">
+                            <span>Select Participants</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Custom Checkbox List Container -->
+                <div id="containerCustomSplit" class="hidden bg-[#F8F9FA] border border-gray-200 rounded-xl p-3 space-y-2">
+                    <p class="text-xs font-bold text-gray-700">Check participants included in this expense:</p>
+                    <div id="containerParticipantCheckboxes" class="space-y-1.5 max-h-40 overflow-y-auto"></div>
+                </div>
+
+                <!-- Save / Update Button -->
+                <button id="btnSaveExpense" class="w-full bg-[#198754] text-white font-bold py-3.5 rounded-xl shadow-md active:opacity-95 transition text-sm mt-2">
+                    Save Expense
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Fullscreen Image Viewer Modal -->
+    <div id="imageModal" class="fixed inset-0 bg-black/80 z-50 hidden flex flex-col items-center justify-center p-4">
+        <div class="max-w-md w-full relative flex flex-col items-center">
+            <button onclick="closeImageModal()" class="absolute -top-10 right-0 bg-white/20 text-white font-bold px-3 py-1 rounded-full text-xs">✕ Close</button>
+            <img id="modalFullImage" src="" alt="Full Receipt" class="max-h-[80vh] max-w-full rounded-2xl object-contain shadow-2xl border border-white/20">
+        </div>
+    </div>
+
+    <!-- Expense Logic Script -->
+    <script>
+        let currentTrip = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (typeof syncFromCloud === 'function') {
+                await syncFromCloud();
+            }
+
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('expenseDate').value = today;
+
+            promptTripSelection();
+            populateDropdowns();
+            loadExpenses();
+
+            document.querySelectorAll('input[name="splitType"]').forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    const customContainer = document.getElementById('containerCustomSplit');
+                    if (e.target.value === 'custom') {
+                        customContainer.classList.remove('hidden');
+                        populateParticipantCheckboxes();
+                    } else {
+                        customContainer.classList.add('hidden');
+                    }
+                });
+            });
+
+            document.getElementById('btnAddCategoryQuick').addEventListener('click', () => {
+                const newCat = prompt('Enter new expense category:');
+                if (newCat && newCat.trim()) {
+                    const catName = newCat.trim();
+                    let categories = JSON.parse(localStorage.getItem('categories') || '[]');
+                    if (!categories.includes(catName)) {
+                        categories.push(catName);
+                        localStorage.setItem('categories', JSON.stringify(categories));
+                        
+                        if (typeof syncToCloud === 'function') {
+                            syncToCloud();
+                        }
+
+                        populateDropdowns();
+                        document.getElementById('expenseCategory').value = catName;
+                    }
+                }
+            });
+
+            document.getElementById('btnSaveExpense').addEventListener('click', () => {
+                if (!currentTrip) {
+                    alert('Please select a trip first.');
+                    promptTripSelection();
+                    return;
+                }
+
+                const expenseId = document.getElementById('editingExpenseId').value;
+                const date = document.getElementById('expenseDate').value;
+                const amount = parseFloat(document.getElementById('expenseAmount').value);
+                const category = document.getElementById('expenseCategory').value;
+                const description = document.getElementById('expenseDescription').value.trim() || 'General Expense';
+                const payer = document.getElementById('expensePayer').value;
+                const splitType = document.querySelector('input[name="splitType"]:checked').value;
+                const receiptImage = document.getElementById('receiptBase64Data').value;
+
+                if (!amount || isNaN(amount) || amount <= 0) {
+                    alert('Please enter a valid expense amount');
+                    return;
+                }
+
+                let includedParticipants = [];
+                if (splitType === 'custom') {
+                    document.querySelectorAll('.participant-checkbox:checked').forEach(cb => {
+                        includedParticipants.push(cb.value);
+                    });
+                    if (includedParticipants.length === 0) {
+                        alert('Please select at least one participant for custom split.');
+                        return;
+                    }
+                }
+
+                let expenses = JSON.parse(localStorage.getItem('expenses') || '[]');
+
+                if (expenseId) {
+                    expenses = expenses.map(e => e.id == expenseId ? {
+                        ...e,
+                        date,
+                        amount,
+                        category,
+                        description,
+                        payer,
+                        splitType,
+                        includedParticipants,
+                        receiptImage
+                    } : e);
+                    alert('Expense updated successfully!');
+                } else {
+                    expenses.push({ 
+                        id: Date.now(), 
+                        tripId: currentTrip.id,
+                        date, 
+                        amount, 
+                        category, 
+                        description, 
+                        payer, 
+                        splitType, 
+                        includedParticipants,
+                        receiptImage
+                    });
+                    alert('Expense saved successfully!');
+                }
+
+                localStorage.setItem('expenses', JSON.stringify(expenses));
+                
+                // Sync changes to GitHub Gist cloud backend via config.js
+                if (typeof syncToCloud === 'function') {
+                    syncToCloud();
+                }
+
+                closeForm();
+                loadExpenses();
+            });
+        });
+
+        // Image Viewer Modal Functions
+        function openImageModal(imgSrc) {
+            document.getElementById('modalFullImage').src = imgSrc;
+            document.getElementById('imageModal').classList.remove('hidden');
+        }
+
+        function closeImageModal() {
+            document.getElementById('imageModal').classList.add('hidden');
+            document.getElementById('modalFullImage').src = '';
+        }
+
+        // Image compression & resizing helper to prevent localStorage quota overflow
+        function handleReceiptUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 600;
+                    const MAX_HEIGHT = 600;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > MAX_WIDTH) {
+                            height *= MAX_WIDTH / width;
+                            width = MAX_WIDTH;
+                        }
+                    } else {
+                        if (height > MAX_HEIGHT) {
+                            width *= MAX_HEIGHT / height;
+                            height = MAX_HEIGHT;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+
+                    document.getElementById('receiptBase64Data').value = compressedDataUrl;
+                    document.getElementById('receiptPreviewImg').src = compressedDataUrl;
+                    document.getElementById('receiptPreviewContainer').classList.remove('hidden');
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function removeReceipt() {
+            document.getElementById('receiptBase64Data').value = '';
+            document.getElementById('receiptPreviewImg').src = '';
+            document.getElementById('receiptPreviewContainer').classList.add('hidden');
+            document.getElementById('receiptInputFile').value = '';
+        }
+
+        function promptTripSelection(forcedPrompt = false) {
+            const trips = JSON.parse(localStorage.getItem('trips') || '[]');
+            if (trips.length === 0) {
+                alert('No trips found. Please create a trip first.');
+                window.location.href = 'index.html';
+                return;
+            }
+
+            const activeTrips = trips.filter(t => t.status !== 'closed');
+            const targetTrips = activeTrips.length > 0 ? activeTrips : trips;
+
+            // If there is only 1 trip and not explicitly forced by the "Switch Trip" button, auto-select it!
+            if (targetTrips.length === 1 && !forcedPrompt) {
+                currentTrip = targetTrips[0];
+                document.getElementById('selectedTripName').textContent = `${currentTrip.destination} (${currentTrip.nature})`;
+                localStorage.setItem('activeTripId', currentTrip.id);
+                loadExpenses();
+                populateDropdowns();
+                return;
+            }
+
+            // Otherwise (multiple trips or forced switch button), show prompt
+            const tripNames = targetTrips.map((t, idx) => `${idx + 1}. ${t.destination} (${t.nature})`).join('\n');
+            const selection = prompt(`Select Active Trip Number:\n${tripNames}`, '1');
+            const index = parseInt(selection) - 1;
+
+            if (!isNaN(index) && targetTrips[index]) {
+                currentTrip = targetTrips[index];
+                document.getElementById('selectedTripName').textContent = `${currentTrip.destination} (${currentTrip.nature})`;
+                localStorage.setItem('activeTripId', currentTrip.id);
+                loadExpenses();
+                populateDropdowns();
+            } else if (!currentTrip && targetTrips.length > 0) {
+                currentTrip = targetTrips[0];
+                document.getElementById('selectedTripName').textContent = `${currentTrip.destination} (${currentTrip.nature})`;
+                populateDropdowns();
+            }
+        }
+
+        function openAddForm() {
+            resetForm();
+            document.getElementById('formHeaderTitle').textContent = 'Add New Expense';
+            document.getElementById('btnSaveExpense').textContent = 'Save Expense';
+            document.getElementById('viewExpenseList').classList.add('hidden');
+            document.getElementById('viewExpenseForm').classList.remove('hidden');
+            
+            if(document.getElementById('rbSplitCustom').checked) {
+                populateParticipantCheckboxes();
+            }
+        }
+
+        function closeForm() {
+            document.getElementById('viewExpenseForm').classList.add('hidden');
+            document.getElementById('viewExpenseList').classList.remove('hidden');
+        }
+
+        function populateDropdowns() {
+            const categories = JSON.parse(localStorage.getItem('categories') || '[]');
+            const catSelect = document.getElementById('expenseCategory');
+            catSelect.innerHTML = '';
+            if (categories.length === 0) {
+                catSelect.innerHTML = '<option value="General">General</option>';
+            } else {
+                categories.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c;
+                    opt.textContent = c;
+                    catSelect.appendChild(opt);
+                });
+            }
+
+            const allParticipants = JSON.parse(localStorage.getItem('participants') || '[]');
+            const tripParticipantsMap = JSON.parse(localStorage.getItem('tripParticipants') || '{}');
+            const assignedIds = currentTrip ? (tripParticipantsMap[currentTrip.id] || []) : [];
+            
+            let tripParticipants = assignedIds.length > 0 
+                ? allParticipants.filter(p => assignedIds.includes(p.id))
+                : allParticipants;
+
+            const payerSelect = document.getElementById('expensePayer');
+            payerSelect.innerHTML = '';
+            
+            if (tripParticipants.length > 0) {
+                tripParticipants.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p.name;
+                    opt.textContent = `${p.name} (${p.family})`;
+                    payerSelect.appendChild(opt);
+                });
+            } else {
+                const opt = document.createElement('option');
+                opt.value = 'Self / Unassigned';
+                opt.textContent = 'Self / Unassigned';
+                payerSelect.appendChild(opt);
+            }
+        }
+
+        function populateParticipantCheckboxes(selectedNames = []) {
+            const allParticipants = JSON.parse(localStorage.getItem('participants') || '[]');
+            const tripParticipantsMap = JSON.parse(localStorage.getItem('tripParticipants') || '{}');
+            const assignedIds = currentTrip ? (tripParticipantsMap[currentTrip.id] || []) : [];
+            
+            const tripParticipants = assignedIds.length > 0 
+                ? allParticipants.filter(p => assignedIds.includes(p.id))
+                : allParticipants;
+
+            const container = document.getElementById('containerParticipantCheckboxes');
+            container.innerHTML = '';
+
+            if (tripParticipants.length === 0) {
+                container.innerHTML = '<p class="text-xs text-gray-500">No participants found. Please add participants in the Roster first.</p>';
+                return;
+            }
+
+            tripParticipants.forEach(p => {
+                const isChecked = selectedNames.length === 0 || selectedNames.includes(p.name);
+                const label = document.createElement('label');
+                label.className = 'flex items-center space-x-2 text-xs font-semibold text-gray-800 cursor-pointer';
+                label.innerHTML = `
+                    <input type="checkbox" value="${p.name}" ${isChecked ? 'checked' : ''} class="participant-checkbox w-4 h-4 text-blue-600 rounded">
+                    <span>${p.name} (${p.family})</span>
+                `;
+                container.appendChild(label);
+            });
+        }
+
+        function loadExpenses() {
+            const expenses = JSON.parse(localStorage.getItem('expenses') || '[]');
+            const listContainer = document.getElementById('expensesList');
+            listContainer.innerHTML = '';
+
+            const filteredExpenses = currentTrip ? expenses.filter(e => e.tripId == currentTrip.id || !e.tripId) : expenses;
+
+            if (filteredExpenses.length === 0) {
+                listContainer.innerHTML = '<p class="text-xs text-gray-500 bg-white p-4 rounded-xl border border-gray-100 text-center">No expenses recorded for this trip yet.</p>';
+                return;
+            }
+
+            filteredExpenses.slice().reverse().forEach((e) => {
+                const card = document.createElement('div');
+                card.className = 'bg-white p-3.5 rounded-xl border border-gray-100 flex justify-between items-center shadow-sm';
+                
+                let receiptThumbHtml = e.receiptImage ? `<img src="${e.receiptImage}" class="w-10 h-10 object-cover rounded-lg border border-gray-200 mt-1 cursor-pointer" onclick="openImageModal('${e.receiptImage}')" title="Click to view receipt">` : '';
+
+                let splitDisplayText = 'Equal among all';
+                if (e.splitType === 'custom' && Array.isArray(e.includedParticipants) && e.includedParticipants.length > 0) {
+                    splitDisplayText = `Custom (${e.includedParticipants.join(', ')})`;
+                }
+
+                card.innerHTML = `
+                    <div class="flex space-x-3 items-start flex-1">
+                        ${receiptThumbHtml}
+                        <div>
+                            <p class="text-sm font-bold text-black">₹${e.amount.toFixed(2)} <span class="text-xs font-normal text-gray-500">Category: ${e.category}</span></p>
+                            <p class="text-xs text-gray-500">${e.description} • Paid by: <strong>${e.payer}</strong></p>
+                            <p class="text-[10px] text-gray-400 mt-0.5">Date: ${e.date} | Split: ${splitDisplayText}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-1.5">
+                        <button onclick="editExpense(${e.id})" class="text-xs text-blue-600 font-bold px-2.5 py-1 bg-blue-50 rounded-lg hover:bg-blue-100">Edit</button>
+                        <button onclick="deleteExpense(${e.id})" class="text-xs text-red-500 font-bold px-2.5 py-1 bg-red-50 rounded-lg hover:bg-red-100">Delete</button>
+                    </div>
+                `;
+                listContainer.appendChild(card);
+            });
+        }
+
+        function editExpense(id) {
+            const expenses = JSON.parse(localStorage.getItem('expenses') || '[]');
+            const e = expenses.find(item => item.id == id);
+            if (!e) return;
+
+            document.getElementById('editingExpenseId').value = e.id;
+            document.getElementById('expenseDate').value = e.date;
+            document.getElementById('expenseAmount').value = e.amount;
+            document.getElementById('expenseCategory').value = e.category;
+            document.getElementById('expenseDescription').value = e.description;
+            document.getElementById('expensePayer').value = e.payer;
+
+            if (e.receiptImage) {
+                document.getElementById('receiptBase64Data').value = e.receiptImage;
+                document.getElementById('receiptPreviewImg').src = e.receiptImage;
+                document.getElementById('receiptPreviewContainer').classList.remove('hidden');
+            } else {
+                removeReceipt();
+            }
+
+            if (e.splitType === 'custom') {
+                document.getElementById('rbSplitCustom').checked = true;
+                document.getElementById('containerCustomSplit').classList.remove('hidden');
+                populateParticipantCheckboxes(e.includedParticipants);
+            } else {
+                document.getElementById('rbSplitEqual').checked = true;
+                document.getElementById('containerCustomSplit').classList.add('hidden');
+            }
+
+            document.getElementById('formHeaderTitle').textContent = 'Edit Expense';
+            document.getElementById('btnSaveExpense').textContent = 'Update Expense';
+            
+            document.getElementById('viewExpenseList').classList.add('hidden');
+            document.getElementById('viewExpenseForm').classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function resetForm() {
+            document.getElementById('editingExpenseId').value = '';
+            document.getElementById('expenseAmount').value = '';
+            document.getElementById('expenseDescription').value = '';
+            document.getElementById('rbSplitEqual').checked = true;
+            document.getElementById('containerCustomSplit').classList.add('hidden');
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('expenseDate').value = today;
+            removeReceipt();
+        }
+
+        function deleteExpense(id) {
+            let expenses = JSON.parse(localStorage.getItem('expenses') || '[]');
+            if (confirm('Delete this expense?')) {
+                expenses = expenses.filter(e => e.id != id);
+                localStorage.setItem('expenses', JSON.stringify(expenses));
+                
+                // Sync deletions to GitHub Gist cloud backend via config.js
+                if (typeof syncToCloud === 'function') {
+                    syncToCloud();
+                }
+
+                loadExpenses();
+            }
+        }
+    </script>
+</body>
+</html>
