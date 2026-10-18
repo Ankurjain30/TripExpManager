@@ -8,7 +8,7 @@
     <!-- Centralized Cloud Configuration & Sync Script -->
     <script src="config.js"></script>
     <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 </head>
 <body class="bg-[#F8F9FA] text-[#212529] font-sans antialiased pb-12">
@@ -54,27 +54,6 @@
                 </div>
 
                 <input type="hidden" id="editingExpenseId" value="">
-
-                <!-- Scan Bill / Upload Receipt Banner -->
-                <section onclick="document.getElementById('receiptInputFile').click()" class="bg-[#E7F1FF] border border-[#0D6EFD] rounded-xl p-3 flex items-center space-x-3 cursor-pointer shadow-sm hover:bg-blue-100 transition">
-                    <div class="text-2xl">📷</div>
-                    <div class="flex-1">
-                        <h3 class="text-xs font-bold text-[#0D6EFD]">Attach or Scan Bill</h3>
-                        <p class="text-[10px] font-semibold text-[#343A40]">Tap to upload receipt photo</p>
-                    </div>
-                </section>
-                <input type="file" id="receiptInputFile" accept="image/*" class="hidden" onchange="handleReceiptUpload(event)">
-
-                <!-- Receipt Preview Container -->
-                <div id="receiptPreviewContainer" class="hidden relative bg-gray-50 border border-gray-200 rounded-xl p-2 flex items-center space-x-3">
-                    <img id="receiptPreviewImg" src="" alt="Receipt Preview" class="w-14 h-14 object-cover rounded-lg border border-gray-300 shadow-sm cursor-pointer" onclick="openImageModal(this.src)">
-                    <div class="flex-1">
-                        <p class="text-xs font-bold text-black">Receipt Attached</p>
-                        <p class="text-[10px] text-gray-500">Compressed & ready to save</p>
-                    </div>
-                    <button type="button" onclick="removeReceipt()" class="bg-red-50 text-red-500 text-xs font-bold px-2.5 py-1 rounded-lg hover:bg-red-100">Remove</button>
-                </div>
-                <input type="hidden" id="receiptBase64Data" value="">
 
                 <!-- Expense Date -->
                 <div>
@@ -148,21 +127,13 @@
 
     </main>
 
-    <!-- Fullscreen Image Viewer Modal -->
-    <div id="imageModal" class="fixed inset-0 bg-black/80 z-50 hidden flex flex-col items-center justify-center p-4">
-        <div class="max-w-md w-full relative flex flex-col items-center">
-            <button onclick="closeImageModal()" class="absolute -top-10 right-0 bg-white/20 text-white font-bold px-3 py-1 rounded-full text-xs">✕ Close</button>
-            <img id="modalFullImage" src="" alt="Full Receipt" class="max-h-[80vh] max-w-full rounded-2xl object-contain shadow-2xl border border-white/20">
-        </div>
-    </div>
-
     <!-- Expense Logic Script -->
     <script>
         let currentTrip = null;
 
-        document.addEventListener('DOMContentLoaded', async () => {
+        document.addEventListener('DOMContentLoaded', () => {
             if (typeof syncFromCloud === 'function') {
-                await syncFromCloud();
+                syncFromCloud();
             }
 
             const today = new Date().toISOString().split('T')[0];
@@ -217,7 +188,6 @@
                 const description = document.getElementById('expenseDescription').value.trim() || 'General Expense';
                 const payer = document.getElementById('expensePayer').value;
                 const splitType = document.querySelector('input[name="splitType"]:checked').value;
-                const receiptImage = document.getElementById('receiptBase64Data').value;
 
                 if (!amount || isNaN(amount) || amount <= 0) {
                     alert('Please enter a valid expense amount');
@@ -246,8 +216,7 @@
                         description,
                         payer,
                         splitType,
-                        includedParticipants,
-                        receiptImage
+                        includedParticipants
                     } : e);
                     alert('Expense updated successfully!');
                 } else {
@@ -260,8 +229,7 @@
                         description, 
                         payer, 
                         splitType, 
-                        includedParticipants,
-                        receiptImage
+                        includedParticipants
                     });
                     alert('Expense saved successfully!');
                 }
@@ -278,67 +246,6 @@
             });
         });
 
-        // Image Viewer Modal Functions
-        function openImageModal(imgSrc) {
-            document.getElementById('modalFullImage').src = imgSrc;
-            document.getElementById('imageModal').classList.remove('hidden');
-        }
-
-        function closeImageModal() {
-            document.getElementById('imageModal').classList.add('hidden');
-            document.getElementById('modalFullImage').src = '';
-        }
-
-        // Image compression & resizing helper to prevent localStorage quota overflow
-        function handleReceiptUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const img = new Image();
-                img.onload = function() {
-                    const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 600;
-                    const MAX_HEIGHT = 600;
-                    let width = img.width;
-                    let height = img.height;
-
-                    if (width > height) {
-                        if (width > MAX_WIDTH) {
-                            height *= MAX_WIDTH / width;
-                            width = MAX_WIDTH;
-                        }
-                    } else {
-                        if (height > MAX_HEIGHT) {
-                            width *= MAX_HEIGHT / height;
-                            height = MAX_HEIGHT;
-                        }
-                    }
-
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-
-                    const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
-
-                    document.getElementById('receiptBase64Data').value = compressedDataUrl;
-                    document.getElementById('receiptPreviewImg').src = compressedDataUrl;
-                    document.getElementById('receiptPreviewContainer').classList.remove('hidden');
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
-        }
-
-        function removeReceipt() {
-            document.getElementById('receiptBase64Data').value = '';
-            document.getElementById('receiptPreviewImg').src = '';
-            document.getElementById('receiptPreviewContainer').classList.add('hidden');
-            document.getElementById('receiptInputFile').value = '';
-        }
-
         function promptTripSelection(forcedPrompt = false) {
             const trips = JSON.parse(localStorage.getItem('trips') || '[]');
             if (trips.length === 0) {
@@ -350,7 +257,17 @@
             const activeTrips = trips.filter(t => t.status !== 'closed');
             const targetTrips = activeTrips.length > 0 ? activeTrips : trips;
 
-            // If there is only 1 trip and not explicitly forced by the "Switch Trip" button, auto-select it!
+            const savedActiveId = localStorage.getItem('activeTripId');
+            const savedTrip = targetTrips.find(t => t.id == savedActiveId);
+
+            if (!forcedPrompt && savedTrip) {
+                currentTrip = savedTrip;
+                document.getElementById('selectedTripName').textContent = `${currentTrip.destination} (${currentTrip.nature})`;
+                loadExpenses();
+                populateDropdowns();
+                return;
+            }
+
             if (targetTrips.length === 1 && !forcedPrompt) {
                 currentTrip = targetTrips[0];
                 document.getElementById('selectedTripName').textContent = `${currentTrip.destination} (${currentTrip.nature})`;
@@ -360,7 +277,6 @@
                 return;
             }
 
-            // Otherwise (multiple trips or forced switch button), show prompt
             const tripNames = targetTrips.map((t, idx) => `${idx + 1}. ${t.destination} (${t.nature})`).join('\n');
             const selection = prompt(`Select Active Trip Number:\n${tripNames}`, '1');
             const index = parseInt(selection) - 1;
@@ -385,7 +301,7 @@
             document.getElementById('viewExpenseList').classList.add('hidden');
             document.getElementById('viewExpenseForm').classList.remove('hidden');
             
-            if(document.getElementById('rbSplitCustom').checked) {
+            if (document.getElementById('rbSplitCustom').checked) {
                 populateParticipantCheckboxes();
             }
         }
@@ -481,21 +397,16 @@
                 const card = document.createElement('div');
                 card.className = 'bg-white p-3.5 rounded-xl border border-gray-100 flex justify-between items-center shadow-sm';
                 
-                let receiptThumbHtml = e.receiptImage ? `<img src="${e.receiptImage}" class="w-10 h-10 object-cover rounded-lg border border-gray-200 mt-1 cursor-pointer" onclick="openImageModal('${e.receiptImage}')" title="Click to view receipt">` : '';
-
                 let splitDisplayText = 'Equal among all';
                 if (e.splitType === 'custom' && Array.isArray(e.includedParticipants) && e.includedParticipants.length > 0) {
                     splitDisplayText = `Custom (${e.includedParticipants.join(', ')})`;
                 }
 
                 card.innerHTML = `
-                    <div class="flex space-x-3 items-start flex-1">
-                        ${receiptThumbHtml}
-                        <div>
-                            <p class="text-sm font-bold text-black">₹${e.amount.toFixed(2)} <span class="text-xs font-normal text-gray-500">Category: ${e.category}</span></p>
-                            <p class="text-xs text-gray-500">${e.description} • Paid by: <strong>${e.payer}</strong></p>
-                            <p class="text-[10px] text-gray-400 mt-0.5">Date: ${e.date} | Split: ${splitDisplayText}</p>
-                        </div>
+                    <div class="flex-1 pr-2">
+                        <p class="text-sm font-bold text-black">₹${Number(e.amount).toFixed(2)} <span class="text-xs font-normal text-gray-500">• ${e.category}</span></p>
+                        <p class="text-xs text-gray-600">${e.description} • Paid by: <strong>${e.payer}</strong></p>
+                        <p class="text-[10px] text-gray-400 mt-0.5">Date: ${e.date} | Split: ${splitDisplayText}</p>
                     </div>
                     <div class="flex items-center space-x-1.5">
                         <button onclick="editExpense(${e.id})" class="text-xs text-blue-600 font-bold px-2.5 py-1 bg-blue-50 rounded-lg hover:bg-blue-100">Edit</button>
@@ -517,14 +428,6 @@
             document.getElementById('expenseCategory').value = e.category;
             document.getElementById('expenseDescription').value = e.description;
             document.getElementById('expensePayer').value = e.payer;
-
-            if (e.receiptImage) {
-                document.getElementById('receiptBase64Data').value = e.receiptImage;
-                document.getElementById('receiptPreviewImg').src = e.receiptImage;
-                document.getElementById('receiptPreviewContainer').classList.remove('hidden');
-            } else {
-                removeReceipt();
-            }
 
             if (e.splitType === 'custom') {
                 document.getElementById('rbSplitCustom').checked = true;
@@ -551,7 +454,6 @@
             document.getElementById('containerCustomSplit').classList.add('hidden');
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('expenseDate').value = today;
-            removeReceipt();
         }
 
         function deleteExpense(id) {

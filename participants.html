@@ -7,8 +7,8 @@
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <!-- Centralized Cloud Configuration & Sync Script -->
     <script src="config.js"></script>
-  <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 </head>
 <body class="bg-[#F8F9FA] text-[#212529] font-sans antialiased pb-28 min-h-screen relative">
@@ -127,7 +127,7 @@
             const createNewOpt = document.createElement('option');
             createNewOpt.value = "CREATE_NEW";
             createNewOpt.textContent = "+ Create New Family...";
-            createNewOpt.className = "font-bold text-blue-600";
+            createNewOpt.className = "font-bold text-blue-600 bg-blue-50";
             select.appendChild(createNewOpt);
         }
 
@@ -195,10 +195,6 @@
                     familyId: familyId ? Number(familyId) : null,
                     family: familyName
                 } : p);
-                editingParticipantId = null;
-                document.getElementById('formTitle').textContent = 'Add New Participant';
-                document.getElementById('btnSaveParticipant').textContent = 'Add Participant';
-                document.getElementById('btnCancelEdit').classList.add('hidden');
             } else {
                 const newParticipant = {
                     id: Date.now(),
@@ -216,8 +212,7 @@
                 syncToCloud();
             }
 
-            nameInput.value = '';
-            loadFamilyDropdown(); 
+            resetForm();
             loadParticipantsList();
             alert('Participant saved successfully!');
         }
@@ -276,7 +271,8 @@
         function resetForm() {
             editingParticipantId = null;
             document.getElementById('inputName').value = '';
-            document.getElementById('selectFamily').value = "";
+            document.getElementById('selectCategory').value = 'Adult';
+            loadFamilyDropdown();
             document.getElementById('formTitle').textContent = 'Add New Participant';
             document.getElementById('btnSaveParticipant').textContent = 'Add Participant';
             document.getElementById('btnCancelEdit').classList.add('hidden');
