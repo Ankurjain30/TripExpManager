@@ -5,8 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Manage Families - Trip Expense Manager</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <!-- Centralized Cloud Configuration & Sync Script -->
-    <script src="config.js"></script>
+   
    <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -134,7 +133,6 @@
                     families.push(newFamily);
                     localStorage.setItem('families', JSON.stringify(families));
 
-                    // Push updates to GitHub Gist cloud backend via config.js
                     if (typeof syncToCloud === 'function') {
                         syncToCloud();
                     }
@@ -168,7 +166,6 @@
                     const card = document.createElement('div');
                     card.className = 'bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3';
                     
-                    // Main Header Row (Click to expand)
                     const headerDiv = document.createElement('div');
                     headerDiv.className = 'flex justify-between items-center cursor-pointer select-none';
                     headerDiv.innerHTML = `
@@ -188,7 +185,6 @@
                     };
                     card.appendChild(headerDiv);
 
-                    // Expandable Body Container
                     const bodyDiv = document.createElement('div');
                     bodyDiv.className = `${isExpanded ? '' : 'hidden'} pt-3 border-t border-gray-100 space-y-3`;
 
@@ -231,7 +227,6 @@
                     }
                     bodyDiv.appendChild(membersListDiv);
 
-                    // Action Buttons Row
                     const actionsDiv = document.createElement('div');
                     actionsDiv.className = 'flex space-x-2 pt-1';
                     actionsDiv.innerHTML = `
@@ -342,11 +337,12 @@
                 `;
             }
 
+            // Always clear modal body cleanly to avoid retaining previous member inputs
             body.innerHTML = `
                 ${existingOptionsHtml}
                 <div class="space-y-2">
                     <label class="block text-xs font-bold text-gray-700 mb-1">${unassignedParticipants.length > 0 ? 'Option 2: Or Create New Member' : 'Create New Member'}</label>
-                    <input type="text" id="inputMemberName" placeholder="e.g. Rahul Sharma" class="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-semibold focus:outline-none focus:border-black">
+                    <input type="text" id="inputMemberName" value="" placeholder="e.g. Rahul Sharma" class="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-semibold focus:outline-none focus:border-black">
                     <select id="selectMemberCategory" class="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-semibold focus:outline-none focus:border-black">
                         <option value="Adult">Adult</option>
                         <option value="Child">Child</option>
