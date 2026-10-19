@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Trip Expense Manager</title>
     
-    <!-- Tailwind CSS CDN for instant, beautiful mobile styling -->
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 
     <!-- Essential iOS PWA Meta Tags -->
@@ -20,11 +20,14 @@
 </head>
 <body class="bg-[#F8F9FA] text-[#212529] font-sans antialiased pb-12">
 
-    <!-- App Bar Toolbar -->
+    <!-- App Bar Toolbar with Visible Version Control -->
     <header class="bg-[#212529] text-white sticky top-0 z-50 shadow-md">
         <div class="max-w-md mx-auto px-4 py-3 flex justify-between items-center">
             <h1 class="text-lg font-bold">Trip Expense Manager</h1>
-            <span id="appVersion" class="text-xs text-gray-400">v2.0</span>
+            <div class="flex items-center space-x-2">
+                <!-- Visible Version Tag -->
+                <span id="appVersionBadge" class="bg-white/10 text-gray-300 text-[11px] font-mono px-2 py-0.5 rounded-md">v2.1.0</span>
+            </div>
         </div>
     </header>
 
@@ -33,9 +36,9 @@
         <div class="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-xs text-blue-900 shadow-sm flex items-start space-x-3">
             <span class="text-2xl">📱</span>
             <div>
-                <p class="font-bold mb-1">Install Trip Expense Manager on iOS</p>
+                <p class="font-bold mb-1">Install on iOS (Safari)</p>
                 <p class="text-blue-700 leading-relaxed">
-                    To run this app full-screen like a native app, tap the <span class="font-bold">Share</span> button in Safari, then select <span class="font-bold">"Add to Home Screen"</span>.
+                    To run full-screen like a native app, tap the <span class="font-bold">Share</span> button in Safari, then select <span class="font-bold">"Add to Home Screen"</span>.
                 </p>
             </div>
         </div>
@@ -47,7 +50,7 @@
             <div class="flex items-start space-x-3">
                 <span class="text-2xl">🤖</span>
                 <div>
-                    <p class="font-bold mb-1">Install Trip Expense Manager</p>
+                    <p class="font-bold mb-1">Install on Android (Chrome)</p>
                     <p class="text-purple-700 leading-relaxed">
                         Install this app for offline use, full-screen speed, and instant home screen access!
                     </p>
@@ -56,6 +59,19 @@
             <button id="btnAndroidInstall" class="w-full bg-[#0D6EFD] text-white font-bold py-2.5 rounded-xl shadow-md active:opacity-90 transition text-xs">
                 Install App Now
             </button>
+        </div>
+    </div>
+
+    <!-- Desktop Install Prompt Banner -->
+    <div id="desktopInstallBanner" class="hidden max-w-md mx-auto px-4 pt-4">
+        <div class="bg-gray-100 border border-gray-300 rounded-2xl p-4 text-xs text-gray-900 shadow-sm flex items-start space-x-3">
+            <span class="text-2xl">💻</span>
+            <div>
+                <p class="font-bold mb-1">Install App on Desktop</p>
+                <p id="desktopInstallText" class="text-gray-700 leading-relaxed">
+                    Click the install icon in your browser's address bar for a dedicated desktop app window.
+                </p>
+            </div>
         </div>
     </div>
 
@@ -72,11 +88,14 @@
         </div>
     </div>
 
-    <!-- OS & PWA Detection Script -->
+    <!-- OS & Browser Detection Script -->
     <script>
         let deferredPrompt = null;
+        const APP_VERSION = 'v2.1.0';
 
         window.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('appVersionBadge').textContent = APP_VERSION;
+
             const userAgent = window.navigator.userAgent.toLowerCase();
             const isIos = /iphone|ipad|ipod/.test(userAgent) && !window.MSStream;
             const isAndroid = /android/.test(userAgent);
@@ -91,6 +110,16 @@
                         deferredPrompt = e;
                         document.getElementById('androidInstallBanner').classList.remove('hidden');
                     });
+                } else {
+                    const isChromeOrEdge = /chrome|chromium|crios|edg/.test(userAgent);
+                    const desktopBannerText = document.getElementById('desktopInstallText');
+                    
+                    if (isChromeOrEdge) {
+                        desktopBannerText.textContent = 'Click the install icon (🖥️ / ➕) in your browser’s address bar to install this app.';
+                    } else {
+                        desktopBannerText.textContent = 'Use your browser menu to add this app to your dock or desktop for quick access.';
+                    }
+                    document.getElementById('desktopInstallBanner').classList.remove('hidden');
                 }
             }
 
@@ -116,7 +145,6 @@
         <section class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
             <span class="text-[11px] font-bold text-gray-400 tracking-wider">ACTIVE TRIP OVERVIEW</span>
             
-            <!-- Professional Dropdown Spinner for Switching Trips -->
             <div class="mt-2 bg-gray-50 border border-gray-200 rounded-xl p-1">
                 <select id="spinnerTripSelector" class="w-full bg-transparent p-2 text-sm font-medium focus:outline-none">
                     <option>No Open Trip Available</option>
@@ -180,7 +208,6 @@
             <h2 class="text-base font-bold text-black mb-2 px-1">Trip Management & Settings</h2>
             <section class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-4">
                 
-                <!-- Row 1 -->
                 <div class="grid grid-cols-3 gap-2 text-center">
                     <button id="mperson" class="p-2 rounded-xl hover:bg-gray-50 text-xs font-medium flex flex-col items-center justify-center space-y-1">
                         <span class="text-xl">👤</span> Person
@@ -193,7 +220,6 @@
                     </button>
                 </div>
 
-                <!-- Row 2 -->
                 <div class="grid grid-cols-3 gap-2 text-center">
                     <button id="addexp" class="p-2 rounded-xl hover:bg-gray-50 text-xs font-medium flex flex-col items-center justify-center space-y-1">
                         <span class="text-xl">💳</span> Expenses
@@ -206,7 +232,6 @@
                     </button>
                 </div>
 
-                <!-- Row 3 -->
                 <div class="grid grid-cols-3 gap-2 text-center">
                     <button id="share" class="p-2 rounded-xl hover:bg-gray-50 text-xs font-medium flex flex-col items-center justify-center space-y-1">
                         <span class="text-xl">🔗</span> Share App
@@ -219,7 +244,6 @@
                     </button>
                 </div>
 
-                <!-- Trip Roster Full-Width Button -->
                 <button id="btnTripInfo" class="w-full bg-[#6C757D] text-white font-bold py-3 rounded-xl shadow-md active:opacity-90 transition text-sm">
                     Trip Roster
                 </button>
@@ -234,10 +258,6 @@
     <!-- Local Utilities & Startup Script -->
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
-            if (typeof syncFromCloud === 'function') {
-                await syncFromCloud();
-            }
-            
             checkStorageQuota();
 
             const btnSync = document.getElementById('btnSyncData');
@@ -246,7 +266,7 @@
 
             btnClear.addEventListener('click', async (e) => {
                 e.stopImmediatePropagation();
-                if (confirm('WARNING: This will permanently delete all trips, expenses, participants, and families from your device and cloud Gist. Are you sure?')) {
+                if (confirm('WARNING: This will permanently delete all trips, expenses, participants, and families from your device. Are you sure?')) {
                     const emptyData = {
                         expenses: [],
                         categories: ["Breakfast","Lunch", "Dinner", "Taxi", "Hotel", "Shopping", "Snacks", "Fuel","Games","Entertainment","Boating", "Rides", "Miscellaneous"],
@@ -263,16 +283,7 @@
                     });
 
                     sessionStorage.setItem('justClearedData', 'true');
-                    
-                    if (typeof syncToCloud === 'function') {
-                        try {
-                            await syncToCloud();
-                        } catch (err) {
-                            console.error('Cloud reset failed:', err);
-                        }
-                    }
-
-                    alert('All local and cloud data cleared successfully.');
+                    alert('All local data cleared successfully.');
                     window.location.reload();
                 }
             }, true);
@@ -298,9 +309,6 @@
                             Object.keys(backupData).forEach(key => {
                                 localStorage.setItem(key, JSON.stringify(backupData[key]));
                             });
-                            if (typeof syncToCloud === 'function') {
-                                syncToCloud();
-                            }
                             alert('Data imported successfully! Refreshing app...');
                             window.location.reload();
                         }
@@ -369,6 +377,8 @@
             });
         }
     </script>
-    <script src="app.js"></script>
+    
+    <!-- AUTO CACHE-BUSTING SCRIPT TAG -->
+    <script src="app.js?v=20261019"></script>
 </body>
 </html>
