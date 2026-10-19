@@ -8,11 +8,9 @@
     <!-- Tailwind CSS CDN for instant, beautiful mobile styling -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 
-    
-
     <!-- Essential iOS PWA Meta Tags -->
     <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes"> <!-- Optional: keep for legacy iOS support -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="TripExp">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -43,6 +41,24 @@
         </div>
     </div>
 
+    <!-- Android Install Prompt Banner -->
+    <div id="androidInstallBanner" class="hidden max-w-md mx-auto px-4 pt-4">
+        <div class="bg-purple-50 border border-purple-200 rounded-2xl p-4 text-xs text-purple-900 shadow-sm flex flex-col space-y-3">
+            <div class="flex items-start space-x-3">
+                <span class="text-2xl">🤖</span>
+                <div>
+                    <p class="font-bold mb-1">Install Trip Expense Manager</p>
+                    <p class="text-purple-700 leading-relaxed">
+                        Install this app for offline use, full-screen speed, and instant home screen access!
+                    </p>
+                </div>
+            </div>
+            <button id="btnAndroidInstall" class="w-full bg-[#0D6EFD] text-white font-bold py-2.5 rounded-xl shadow-md active:opacity-90 transition text-xs">
+                Install App Now
+            </button>
+        </div>
+    </div>
+
     <!-- Storage Warning Banner -->
     <div id="storageWarningBanner" class="hidden max-w-md mx-auto px-4 pt-4">
         <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-900 shadow-sm flex items-start space-x-3">
@@ -56,12 +72,42 @@
         </div>
     </div>
 
+    <!-- OS & PWA Detection Script -->
     <script>
-        const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
-        const isInStandaloneMode = ('standalone' in window.navigator) && (window.navigator.standalone);
-        if (isIos && !isInStandaloneMode) {
-            document.getElementById('iosInstallBanner').classList.remove('hidden');
-        }
+        let deferredPrompt = null;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const userAgent = window.navigator.userAgent.toLowerCase();
+            const isIos = /iphone|ipad|ipod/.test(userAgent) && !window.MSStream;
+            const isAndroid = /android/.test(userAgent);
+            const isInStandaloneMode = ('standalone' in window.navigator && window.navigator.standalone) || window.matchMedia('(display-mode: standalone)').matches;
+
+            if (!isInStandaloneMode) {
+                if (isIos) {
+                    document.getElementById('iosInstallBanner').classList.remove('hidden');
+                } else if (isAndroid) {
+                    window.addEventListener('beforeinstallprompt', (e) => {
+                        e.preventDefault();
+                        deferredPrompt = e;
+                        document.getElementById('androidInstallBanner').classList.remove('hidden');
+                    });
+                }
+            }
+
+            const btnAndroidInstall = document.getElementById('btnAndroidInstall');
+            if (btnAndroidInstall) {
+                btnAndroidInstall.addEventListener('click', async () => {
+                    if (deferredPrompt) {
+                        deferredPrompt.prompt();
+                        const { outcome } = await deferredPrompt.userChoice;
+                        if (outcome === 'accepted') {
+                            document.getElementById('androidInstallBanner').classList.add('hidden');
+                        }
+                        deferredPrompt = null;
+                    }
+                });
+            }
+        });
     </script>
 
     <main class="max-w-md mx-auto p-4 space-y-4">
@@ -289,29 +335,28 @@
             }
         }
 
-  function exportData() {
-    // 1. Recalculate totals first so backup is fully accurate
-    if (typeof recalculateTripTotals === 'function') {
-        recalculateTripTotals();
-    }
+        function exportData() {
+            if (typeof recalculateTripTotals === 'function') {
+                recalculateTripTotals();
+            }
 
-    const backup = {};
-    for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        try {
-            backup[key] = JSON.parse(localStorage.getItem(key));
-        } catch (e) {
-            backup[key] = localStorage.getItem(key);
+            const backup = {};
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                try {
+                    backup[key] = JSON.parse(localStorage.getItem(key));
+                } catch (e) {
+                    backup[key] = localStorage.getItem(key);
+                }
+            }
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backup, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `trip_expense_backup_${new Date().toISOString().split('T')[0]}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
         }
-    }
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backup, null, 2));
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `trip_expense_backup_${new Date().toISOString().split('T')[0]}.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
-}
     </script>
 
     <!-- Service Worker Registration -->
